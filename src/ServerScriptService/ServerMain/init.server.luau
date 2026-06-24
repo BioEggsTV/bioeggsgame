@@ -43,7 +43,6 @@ local function _CleanupPlayer(user_id: number)
 
 	-- Finalize misc stats before saving
 	MiscModule.UpdatePlaytime(user_id, player_data)
-	MiscModule.OnPlayerRemoving(user_id)
 
 	-- Save all player data, releasing the session lock
 	DataModule.SaveData(user_id, true)
