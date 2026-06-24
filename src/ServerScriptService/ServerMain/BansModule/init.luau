@@ -42,7 +42,7 @@ local function _GetData(user_id: number): any
             task.wait(2 ^ attempt)
         end
     end
-    warn("BansModule/ERROR: Kicking player after fail to retrieve data after 3 attempts: " .. user_id)
+    warn(string.format("BansModule/ERROR: Kicking player after fail to retrieve data after 3 attempts: %i", user_id))
     local player = Players:GetPlayerByUserId(user_id)
     if player then
         player:Kick("Roblox data stores are down. Please try rejoining later.")

@@ -1,24 +1,28 @@
 -- ServerScriptService/ServerMain/InventoryModule
+
 --[[
 	Script By: BioEggsHD
 	Handles player inventories
 ]]--
 
 --// SERVICES //--
+
 local Players = game:GetService("Players")
 
 --// VARIABLES //--
-type item_type      = {[string]: any}           -- [property_name]: value
-type inventory_type = {[string]: item_type}     -- [item_name]: item_data
 
--- Holds a live reference to each player's _inventory slice inside the master
--- data table. Mutations here are reflected in DataModule's PLAYER_DATA automatically.
+type item_type = {[string]: any} -- [property_name]: value
+type inventory_type = {[string]: item_type} -- [item_name]: item_data
+
+-- Holds references to players _inventory directory inside PLAYER_DATA
 local INVENTORIES: {[number]: inventory_type} = {} -- [user_id]: _inventory table
 
 --// MODULE //--
+
 local InventoryModule = {}
 
 --- Private
+
 -- Deep copy a table
 local function _DeepCopy(t: {[any]: any}): {[any]: any}
 	local copy = {}
@@ -37,10 +41,7 @@ local function _Allocate(user_id: number, inventory: inventory_type)
 	if INVENTORIES[user_id] then
 		local player: Player? = Players:GetPlayerByUserId(user_id)
 		local user_name = player and player.Name or "Unknown"
-		warn(string.format(
-			"InventoryModule/WARNING: updating already existing data allocation for player: %s, %i",
-			user_name, user_id
-		))
+		warn(string.format("InventoryModule/WARNING: updating already existing data allocation for player: %s, %i", user_name, user_id))
 	end
 	INVENTORIES[user_id] = inventory
 end
@@ -56,7 +57,7 @@ end
 local function _AddItems(user_id: number, items: inventory_type)
 	local inventory = INVENTORIES[user_id]
 	if not inventory then
-		warn("InventoryModule/ERROR: no player inventory directory: " .. tostring(user_id))
+        warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return
 	end
 
@@ -65,10 +66,7 @@ local function _AddItems(user_id: number, items: inventory_type)
 		if current_item then
 			current_item.Count += (item_data.Count or 0)
 		else
-			warn(string.format(
-				"InventoryModule/ERROR: no such item \"%s\" while adding items to %i; skipping item",
-				item_name, user_id
-			))
+			warn(string.format("InventoryModule/ERROR: no such item \"%s\" while adding items to %i; skipping item", item_name, user_id))
 		end
 	end
 end
@@ -77,7 +75,7 @@ end
 local function _RemoveItems(user_id: number, items: inventory_type)
 	local inventory = INVENTORIES[user_id]
 	if not inventory then
-		warn("InventoryModule/ERROR: no player inventory directory: " .. tostring(user_id))
+        warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return
 	end
 
@@ -86,10 +84,7 @@ local function _RemoveItems(user_id: number, items: inventory_type)
 		if current_item then
 			current_item.Count = math.max(0, current_item.Count - (item_data.Count or 0))
 		else
-			warn(string.format(
-				"InventoryModule/ERROR: no such item \"%s\" while removing items from %i; skipping item",
-				item_name, user_id
-			))
+			warn(string.format("InventoryModule/ERROR: no such item \"%s\" while removing items from %i; skipping item", item_name, user_id))
 		end
 	end
 end
@@ -100,7 +95,7 @@ local function _GetInventory(user_id: number): inventory_type?
 	if inventory then
 		return _DeepCopy(inventory)
 	else
-		warn("InventoryModule/ERROR: no player inventory directory: " .. tostring(user_id))
+        warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return nil
 	end
 end
@@ -109,15 +104,12 @@ end
 local function _GetItemCount(user_id: number, item_name: string): number?
 	local inventory = INVENTORIES[user_id]
 	if not inventory then
-		warn("InventoryModule/ERROR: no player inventory directory: " .. tostring(user_id))
+        warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return nil
 	end
 
 	if not inventory[item_name] then
-		warn(string.format(
-			"InventoryModule/ERROR: no such item \"%s\" while getting item count of %i",
-			item_name, user_id
-		))
+		warn(string.format("InventoryModule/ERROR: no such item \"%s\" while getting item count of %i", item_name, user_id))
 		return nil
 	end
 
@@ -125,29 +117,28 @@ local function _GetItemCount(user_id: number, item_name: string): number?
 end
 
 --- Public
--- Create a players inventory in the directory using the already-loaded player_data
--- player_data is the full data table from DataModule (held by reference)
+
+-- Create player inventory directory using player_data (from ServerMain)
 function InventoryModule.CreateInventory(user_id: number, player_data: {[string]: any})
 	if not player_data or not player_data._inventory then
-		warn("InventoryModule/ERROR: no _inventory key in player data for user: " .. tostring(user_id))
+        warn(string.format("InventoryModule/ERROR: no _inventory key in player data for user: %i", user_id))
 		return
 	end
-	-- Store a live reference to the _inventory slice; mutations here flow back
-	-- through to DataModule's PLAYER_DATA automatically
 	_Allocate(user_id, player_data._inventory)
 	-- adding further logic like ui here later
 end
 
 -- Remove a players inventory in the directory
--- Inventory data is persisted through DataModule.SaveData in ServerMain;
--- this function only cleans up the local runtime reference
 function InventoryModule.RemoveInventory(user_id: number)
 	_Wipe(user_id)
 end
 
-InventoryModule.AddItems      = _AddItems
-InventoryModule.RemoveItems   = _RemoveItems
-InventoryModule.GetInventory  = _GetInventory
-InventoryModule.GetItemCount  = _GetItemCount
+InventoryModule.AddItems = _AddItems
+
+InventoryModule.RemoveItems = _RemoveItems
+
+InventoryModule.GetInventory = _GetInventory
+
+InventoryModule.GetItemCount = _GetItemCount
 
 return InventoryModule

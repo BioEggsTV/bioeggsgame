@@ -14,7 +14,7 @@ local DataStoreService = game:GetService("DataStoreService")
 
 --// VARIABLES //--
 
-local StatsDataStore = DataStoreService:GetDataStore("StatsDataStore_v1")
+local MainDataStore = DataStoreService:GetDataStore("MainDataStore_v1")
 local CURRENT_DATA_VERSION = 1
 
 local PLAYER_DATA: {[number]: {[string]: any}} = {} -- [user_id]: full data table
@@ -38,9 +38,6 @@ local function _DeepCopy(t: {[any]: any}): {[any]: any}
     return copy
 end
 
--- Generate a fresh default data table
--- NOTE: Fields whose correct default depends on join time (e.g. FirstTimeJoined)
--- are left nil here and filled in by their respective module on first load
 local function _GenerateDefaultData(): {[string]: any}
     return {
         Version = CURRENT_DATA_VERSION,
@@ -49,11 +46,13 @@ local function _GenerateDefaultData(): {[string]: any}
             Kills = 0,
             Wins = 0
         },
+
         _misc = {
             FirstTimeJoined = nil,
             TimesJoined = 0,
             Playtime = 0
         },
+
         _inventory = {
             CoinsPotion = {
                 Count = 0
@@ -65,7 +64,7 @@ local function _GenerateDefaultData(): {[string]: any}
     }
 end
 
--- Recursively fill in any missing keys from template without overwriting existing data
+-- Fill in any missing keys from template
 local function _Reconcile(data: {[string]: any}, template: {[string]: any}): {[string]: any}
     for key, value in template do
         if data[key] == nil then
@@ -97,13 +96,12 @@ end
 
 --- Public
 
--- Load all data for a player in a single DataStore call
--- Returns the live data table (held by reference in PLAYER_DATA)
+-- Return all player data, held by reference in PLAYER_DATA
 function DataModule.GetData(user_id: number): {[string]: any}?
     local success, result
     for attempt = 1, 3 do
         success, result = pcall(function()
-            return StatsDataStore:UpdateAsync(tostring(user_id), function(old_data)
+            return MainDataStore:UpdateAsync(tostring(user_id), function(old_data)
                 local data = old_data
 
                 if data == nil then
@@ -133,7 +131,7 @@ function DataModule.GetData(user_id: number): {[string]: any}?
         end
     end
 
-    warn("DataModule/ERROR: kicking player after fail to retrieve data after 3 attempts: " .. tostring(user_id))
+    warn(string.format("DataModule/ERROR: kicking player after fail to retrieve data after 3 attempts: %i", user_id))
     local player = Players:GetPlayerByUserId(user_id)
     if player then
         player:Kick("Roblox data stores are down or session is locked. Please try rejoining later.")
@@ -141,20 +139,18 @@ function DataModule.GetData(user_id: number): {[string]: any}?
     return nil
 end
 
--- Save all data for a player in a single DataStore call
--- Modules mutate their slice of PLAYER_DATA directly so no merging is needed here
--- Pass release_session = true when the player is leaving
+-- Save all player data
 function DataModule.SaveData(user_id: number, release_session: boolean?): boolean
     local current_data = PLAYER_DATA[user_id]
     if not current_data then
-        warn("DataModule/ERROR: no data in directory to save for user: " .. tostring(user_id))
+        warn(string.format("DataModule/ERROR: no data in directory to save for user: %i", user_id))
         return false
     end
 
     local success, result
     for attempt = 1, 3 do
         success, result = pcall(function()
-            StatsDataStore:UpdateAsync(tostring(user_id), function(old_data)
+            MainDataStore:UpdateAsync(tostring(user_id), function(old_data)
                 if old_data and old_data.SessionId and old_data.SessionId ~= game.JobId and game.JobId ~= "" then
                     error("DataModule/ERROR: session lock mismatch; cannot overwrite data from another server")
                 end
@@ -179,7 +175,7 @@ function DataModule.SaveData(user_id: number, release_session: boolean?): boolea
         end
     end
 
-    warn("DataModule/ERROR: failed to save data after 3 attempts for user: " .. tostring(user_id))
+    warn(string.format("DataModule/ERROR: failed to save data after 3 attempts for user: %i", user_id))
     return false
 end
 
