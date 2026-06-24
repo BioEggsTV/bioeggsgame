@@ -17,7 +17,7 @@ local Players = game:GetService("Players")
 local AdminModule = require(script:FindFirstChild("AdminModule"))
 local BansModule = require(script:FindFirstChild("BansModule"))
 local DataModule = require(script:FindFirstChild("DataModule"))
-local InventoryModule = require(script:FindFirstChild("InventoryModule"))
+--local InventoryModule = require(script:FindFirstChild("InventoryModule"))
 local LeaderstatsModule = require(script:FindFirstChild("LeaderstatsModule"))
 
 --// Functions //--
