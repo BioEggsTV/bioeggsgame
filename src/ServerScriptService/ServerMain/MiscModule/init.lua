@@ -3,7 +3,7 @@
 --[[
 
 Script By: BioEggsHD
-Handles miscellaneous player data.
+Handles miscellaneous player data
 
 ]]--
 
@@ -26,10 +26,7 @@ local function _Allocate(user_id: number, player_data: {[string]: any})
         misc.FirstTimeJoined = os.time()
     end
 
-    -- Increment session count on every join
     misc.TimesJoined += 1
-
-    -- Record the session start time for playtime tracking
     SESSION_START[user_id] = os.time()
 end
 
@@ -41,7 +38,6 @@ end
 --- Public
 
 -- Initialize misc data for a player
--- player_data is the full data table from DataModule (held by reference)
 function MiscModule.CreateMisc(user_id: number, player_data: {[string]: any})
     if not player_data._misc then
         warn("MiscModule/ERROR: no _misc key in player data for user: " .. tostring(user_id))
@@ -56,8 +52,7 @@ function MiscModule.OnPlayerRemoving(user_id: number)
     -- Playtime is updated directly via UpdatePlaytime during the session
 end
 
--- Accumulate elapsed playtime into the data table (call periodically or on remove)
--- player_data is the same reference passed to CreateMisc
+-- Accumulate elapsed playtime into the data table
 function MiscModule.UpdatePlaytime(user_id: number, player_data: {[string]: any})
     local session_start = SESSION_START[user_id]
     if not session_start then
@@ -70,7 +65,6 @@ function MiscModule.UpdatePlaytime(user_id: number, player_data: {[string]: any}
     end
     local elapsed = os.time() - session_start
     player_data._misc.Playtime += elapsed
-    -- Reset session start so repeated calls don't double-count
     SESSION_START[user_id] = os.time()
 end
 
@@ -80,7 +74,6 @@ function MiscModule.RemoveMisc(user_id: number)
 end
 
 -- Get a misc stat for a player
--- player_data is the same reference passed to CreateMisc
 function MiscModule.GetStat(user_id: number, player_data: {[string]: any}, stat_name: string): any
     if not player_data or not player_data._misc then
         warn("MiscModule/ERROR: no _misc data found for user: " .. tostring(user_id))
