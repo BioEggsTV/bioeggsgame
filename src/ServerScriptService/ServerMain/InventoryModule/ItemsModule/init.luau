@@ -16,6 +16,8 @@ export type item_type = {
     Data: {[string]: any}
 }
 
+-- Stackable items use id as index;
+-- Unique items use own Name as index
 ItemsModule.ItemDatabase = {
     experience_potion_1 = {
         Name = "Small Experience Potion",
