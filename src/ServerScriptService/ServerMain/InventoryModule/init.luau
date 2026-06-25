@@ -11,6 +11,8 @@ local Players = game:GetService("Players")
 
 --// VARIABLES //--
 
+local ItemsModule = require(script:FindFirstChild("ItemsModule")
+
 type item_type = {
     Name: string,
     Category: "Boosts" | "Pets",
@@ -66,16 +68,29 @@ local function _AddItems(user_id: number, items: inventory_type)
 		return
 	end
 
-	for item_name: string, item_data: item_type in items do
-		local current_item: item_type = inventory[item_name]
-		if current_item then
-			current_item.Data.Count += (item_data.Data.Count or 0)
+	for item_name: string, item_data: item_type in items.Stackable do
+		if not ItemsModule.ItemDatabase[item_name] then
+			warn(string.format("InventoryModule/ERROR: no such stackable item \"%s\" while adding items to %i; skipping item", item_name, user_id))
+			continue
+		end
+		
+		if not inventory[item_name] then
+			inventory.Stackable[item_name] = item_data or ItemsModule.ItemDatabase[item_name]
 		else
-			warn(string.format("InventoryModule/ERROR: no such item \"%s\" while adding items to %i; skipping item", item_name, user_id))
+			inventory.Stackable[item_name].Data.Count += item_data.Data.Count or 0
 		end
 	end
-end
 
+	for index: number, item_data: item_type in items.Unique do
+		if not ItemsModule.ItemDatabase[item_data.Name] then
+            warn(string.format("InventoryModule/ERROR: no such unique item \"%s\" while adding items to %i; skipping item", item_data.Name, user_id))
+			continue
+		end
+
+		table.insert(inventory, item_data)
+	end
+end
+	
 -- Remove items from a players inventory
 local function _RemoveItems(user_id: number, items: inventory_type)
 	local inventory: inventory_type = INVENTORIES[user_id]
