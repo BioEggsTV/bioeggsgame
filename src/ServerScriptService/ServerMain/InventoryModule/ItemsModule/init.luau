@@ -27,7 +27,7 @@ ItemsModule.ItemDatabase = {
         }
     },
 
-    dog = {
+    Dog = {
         Name = "Dog",
         Category = "Pets",
         Type = "Unique",
