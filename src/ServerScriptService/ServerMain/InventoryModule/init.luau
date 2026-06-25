@@ -11,11 +11,16 @@ local Players = game:GetService("Players")
 
 --// VARIABLES //--
 
-type item_type = {[string]: any} -- [property_name]: value
+type item_type = {
+    Name: string,
+    Category: "Boosts" | "Pets",
+    Type: "Stackable" | "Unique",
+    Data: {[string]: any}
+}
 type inventory_type = {[string]: item_type} -- [item_name]: item_data
 
 -- Holds references to players _inventory directory inside PLAYER_DATA
-local INVENTORIES: {[number]: inventory_type} = {} -- [user_id]: _inventory table
+local INVENTORIES: {[number]: inventory_type} = {} -- [user_id]: _inventory reference
 
 --// MODULE //--
 
@@ -36,7 +41,7 @@ local function _DeepCopy(t: {[any]: any}): {[any]: any}
 	return copy
 end
 
--- Allocate a live reference to the player's inventory slice
+-- Allocate a reference to the players inventory directory
 local function _Allocate(user_id: number, inventory: inventory_type)
 	if INVENTORIES[user_id] then
 		local player: Player? = Players:GetPlayerByUserId(user_id)
@@ -55,16 +60,16 @@ end
 
 -- Add an item pool to a players inventory
 local function _AddItems(user_id: number, items: inventory_type)
-	local inventory = INVENTORIES[user_id]
+	local inventory: inventory_type = INVENTORIES[user_id]
 	if not inventory then
         warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return
 	end
 
 	for item_name: string, item_data: item_type in items do
-		local current_item = inventory[item_name]
+		local current_item: item_type = inventory[item_name]
 		if current_item then
-			current_item.Count += (item_data.Count or 0)
+			current_item.Data.Count += (item_data.Data.Count or 0)
 		else
 			warn(string.format("InventoryModule/ERROR: no such item \"%s\" while adding items to %i; skipping item", item_name, user_id))
 		end
@@ -73,27 +78,27 @@ end
 
 -- Remove items from a players inventory
 local function _RemoveItems(user_id: number, items: inventory_type)
-	local inventory = INVENTORIES[user_id]
+	local inventory: inventory_type = INVENTORIES[user_id]
 	if not inventory then
         warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return
 	end
 
 	for item_name: string, item_data: item_type in items do
-		local current_item = inventory[item_name]
+		local current_item: item_type = inventory[item_name]
 		if current_item then
-			current_item.Count = math.max(0, current_item.Count - (item_data.Count or 0))
+			current_item.Data.Count = math.max(0, current_item.Data.Count - (item_data.Data.Count or 0))
 		else
 			warn(string.format("InventoryModule/ERROR: no such item \"%s\" while removing items from %i; skipping item", item_name, user_id))
 		end
 	end
 end
 
--- Get a players inventory
-local function _GetInventory(user_id: number): inventory_type?
+-- Get a player inventory copy or reference
+local function _GetInventory(user_id: number, by_reference: boolean): inventory_type?
 	local inventory = INVENTORIES[user_id]
 	if inventory then
-		return _DeepCopy(inventory)
+		return by_reference and inventory or _DeepCopy(inventory)
 	else
         warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return nil
@@ -102,7 +107,7 @@ end
 
 -- Get item count in a players inventory
 local function _GetItemCount(user_id: number, item_name: string): number?
-	local inventory = INVENTORIES[user_id]
+	local inventory: inventory_type = INVENTORIES[user_id]
 	if not inventory then
         warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return nil
@@ -113,7 +118,7 @@ local function _GetItemCount(user_id: number, item_name: string): number?
 		return nil
 	end
 
-	return inventory[item_name].Count or 0
+	return inventory[item_name].Data.Count or 0
 end
 
 --- Public

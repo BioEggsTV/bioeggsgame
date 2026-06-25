@@ -54,12 +54,8 @@ local function _GenerateDefaultData(): {[string]: any}
         },
 
         _inventory = {
-            CoinsPotion = {
-                Count = 0
-            },
-            GemsPotion = {
-                Count = 0
-            }
+            Stackable = {},
+            Unique = {}
         }
     }
 end

@@ -43,6 +43,7 @@ local function _CleanupPlayer(user_id: number)
 
 	-- Finalize misc stats before saving
 	MiscModule.UpdatePlaytime(user_id, player_data)
+	MiscModule.OnPlayerRemoving(user_id)
 
 	-- Save all player data, releasing the session lock
 	DataModule.SaveData(user_id, true)
@@ -87,7 +88,7 @@ function OnPlayerAdded(player: Player)
 	end
 
 	-- Load all player data
-	local player_data = DataModule.GetData(user_id)
+	local player_data = DataModule.GetData(user_id) -- Reference inside DataModule
 	if not player_data then return end
 
 	-- Initialize all modules
@@ -95,13 +96,17 @@ function OnPlayerAdded(player: Player)
 	LeaderstatsModule.CreateLeaderstats(user_id, player_data)
 	InventoryModule.CreateInventory(user_id, player_data)
 
+	-- Check if player left during initialization
+	if not Players.GetPlayerByUserId(user_id) then
+		_CleanupPlayer(user_id)
+	end
+
 	-- Update playtime every 60 seconds
 	task.spawn(function()
 		while player.Parent do
 			task.wait(60)
 			if player.Parent then
 				MiscModule.UpdatePlaytime(user_id, player_data)
-				DataModule.SaveData(user_id, false)
 			end
 		end
 	end)
