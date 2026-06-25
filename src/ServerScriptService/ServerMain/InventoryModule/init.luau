@@ -11,7 +11,7 @@ local Players = game:GetService("Players")
 
 --// VARIABLES //--
 
-local ItemsModule = require(script:FindFirstChild("ItemsModule")
+local ItemsModule = require(script:FindFirstChild("ItemsModule"))
 
 type item_type = {
     Name: string,
@@ -19,7 +19,7 @@ type item_type = {
     Type: "Stackable" | "Unique",
     Data: {[string]: any}
 }
-type inventory_type = {[string]: item_type} -- [item_name]: item_data
+type inventory_type = {[string]: {[string | number]: item_type}} -- ["Stackable" | "Unique"]: [item_name | index]: item_data
 
 -- Holds references to players _inventory directory inside PLAYER_DATA
 local INVENTORIES: {[number]: inventory_type} = {} -- [user_id]: _inventory reference
@@ -87,26 +87,55 @@ local function _AddItems(user_id: number, items: inventory_type)
 			continue
 		end
 
-		table.insert(inventory, item_data)
+		table.insert(inventory.Unique, item_data)
 	end
 end
 	
 -- Remove items from a players inventory
-local function _RemoveItems(user_id: number, items: inventory_type)
-	local inventory: inventory_type = INVENTORIES[user_id]
-	if not inventory then
+local function _RemoveItems(user_id: number, items: player_inventory_layout)
+    local inventory = INVENTORIES[user_id]
+    if not inventory then
         warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
-		return
-	end
+        return
+    end
 
-	for item_name: string, item_data: item_type in items do
-		local current_item: item_type = inventory[item_name]
-		if current_item then
-			current_item.Data.Count = math.max(0, current_item.Data.Count - (item_data.Data.Count or 0))
-		else
-			warn(string.format("InventoryModule/ERROR: no such item \"%s\" while removing items from %i; skipping item", item_name, user_id))
-		end
-	end
+    if items.Stackable then
+        for item_name: string, item_data: item_type in items.Stackable do
+            local current_item = inventory.Stackable[item_name]
+            if current_item then
+                local remove_amount = item_data.Data.Count or 0
+                local new_count = math.max(0, current_item.Data.Count - remove_amount)
+                
+                if new_count == 0 then
+                    inventory.Stackable[item_name] = nil
+                else
+                    current_item.Data.Count = new_count
+                end
+            else
+                warn(string.format("InventoryModule/ERROR: no such stackable item \"%s\" to remove from %i", item_name, user_id))
+            end
+        end
+    end
+
+    if items.Unique then
+        for index: number, item_data: item_type in items.Unique do
+            local removed = false
+            
+            for i = #inventory.Unique, 1, -1 do
+                local current_unique = inventory.Unique[i]
+                
+                if current_unique.Name == item_data.Name then
+                    table.remove(inventory.Unique, i)
+                    removed = true
+                    break
+                end
+            end
+            
+            if not removed then
+                warn(string.format("InventoryModule/ERROR: unique item \"%s\" not found to remove from %i", item_data.Name, user_id))
+            end
+        end
+    end
 end
 
 -- Get a player inventory copy or reference
@@ -120,7 +149,7 @@ local function _GetInventory(user_id: number, by_reference: boolean): inventory_
 	end
 end
 
--- Get item count in a players inventory
+-- Get item count (stackable) in a players inventory
 local function _GetItemCount(user_id: number, item_name: string): number?
 	local inventory: inventory_type = INVENTORIES[user_id]
 	if not inventory then
@@ -128,12 +157,12 @@ local function _GetItemCount(user_id: number, item_name: string): number?
 		return nil
 	end
 
-	if not inventory[item_name] then
-		warn(string.format("InventoryModule/ERROR: no such item \"%s\" while getting item count of %i", item_name, user_id))
+	if not inventory.Stackable[item_name] then
+		warn(string.format("InventoryModule/ERROR: no item \"%s\" in player inventory while getting item count in %i", item_name, user_id))
 		return nil
 	end
 
-	return inventory[item_name].Data.Count or 0
+	return inventory.Stackable[item_name].Data.Count or 0
 end
 
 --- Public
