@@ -54,6 +54,13 @@ local function _CleanupPlayer(user_id: number)
 	InventoryModule.RemoveInventory(user_id)
 end
 
+function _InitModules()
+	for _, module_instance: ModuleScript in script:GetChildren() do
+		if not module_instance:IsA("ModuleScript") then continue end
+		--local m
+	end
+end
+
 --- Callback
 
 function OnPlayerAdded(player: Player)
