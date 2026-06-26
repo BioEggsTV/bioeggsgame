@@ -19,7 +19,7 @@ type item_type = {
     Type: "Stackable" | "Unique",
     Data: {[string]: any}
 }
-type inventory_type = {[string]: {[string | number]: item_type}} -- ["Stackable" | "Unique"]: [item_name | index]: item_data
+type inventory_type = {[string]: {[any]: item_type}} -- ["Stackable" | "Unique"]: [item_name | index]: item_data
 
 -- Holds references to players _inventory directory inside PLAYER_DATA
 local INVENTORIES: {[number]: inventory_type} = {} -- [user_id]: _inventory reference
@@ -92,7 +92,7 @@ local function _AddItems(user_id: number, items: inventory_type)
 end
 	
 -- Remove items from a players inventory
-local function _RemoveItems(user_id: number, items: player_inventory_layout)
+local function _RemoveItems(user_id: number, items: inventory_type)
     local inventory = INVENTORIES[user_id]
     if not inventory then
         warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
