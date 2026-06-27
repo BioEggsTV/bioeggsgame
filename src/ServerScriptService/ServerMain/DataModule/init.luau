@@ -1,18 +1,22 @@
 -- ServerScriptService/ServerMain/DataModule
 
 --[[
-
-Script By: BioEggsHD
-Handles loading and saving of player data
-
+    Script By: BioEggsHD
+    Handles loading and saving of player data
 ]]--
 
 --// SERVICES //--
 
 local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
 local DataStoreService = game:GetService("DataStoreService")
 
 --// VARIABLES //--
+
+local SharedUtils = ServerScriptService.SharedUtils
+local ServerMain = ServerScriptService.ServerMain
+local TableUtil = require(SharedUtils:FindFirstChild("TableUtil"))
+local ItemsModule = require(ServerMain.InventoryModule.ItemsModule)
 
 local MainDataStore = DataStoreService:GetDataStore("MainDataStore_v1")
 local CURRENT_DATA_VERSION = 1
@@ -25,26 +29,12 @@ local DataModule = {}
 
 --- Private
 
--- Deep copy a table
-local function _DeepCopy(t: {[any]: any}): {[any]: any}
-    local copy = {}
-    for k, v in t do
-        if type(v) == "table" then
-            copy[k] = _DeepCopy(v)
-        else
-            copy[k] = v
-        end
-    end
-    return copy
-end
-
 local function _GenerateDefaultData(): {[string]: any}
     return {
         Version = CURRENT_DATA_VERSION,
         SessionId = nil,
         _leaderstats = {
-            Kills = 0,
-            Wins = 0
+            Gems = 0
         },
 
         _misc = {
@@ -58,22 +48,6 @@ local function _GenerateDefaultData(): {[string]: any}
             Unique = {}
         }
     }
-end
-
--- Fill in any missing keys from template
-local function _Reconcile(data: {[string]: any}, template: {[string]: any}): {[string]: any}
-    for key, value in template do
-        if data[key] == nil then
-            if type(value) == "table" then
-                data[key] = _DeepCopy(value)
-            else
-                data[key] = value
-            end
-        elseif type(data[key]) == "table" and type(value) == "table" then
-            _Reconcile(data[key], value)
-        end
-    end
-    return data
 end
 
 -- Migrate data across versions
@@ -108,7 +82,7 @@ function DataModule.GetData(user_id: number): {[string]: any}?
                     end
                 end
 
-                data = _Reconcile(data, _GenerateDefaultData())
+                data = TableUtil.Reconcile(data, _GenerateDefaultData())
                 data = _MigrateData(data)
                 data.SessionId = game.JobId
 
@@ -173,6 +147,19 @@ function DataModule.SaveData(user_id: number, release_session: boolean?): boolea
 
     warn(string.format("DataModule/ERROR: failed to save data after 3 attempts for user: %i", user_id))
     return false
+end
+
+-- Modify a player inventory
+function DataModule.UpdateInventory(user_id: number, inventory: ItemsModule.inventory_type)
+    local current_data = PLAYER_DATA[user_id]
+    if not current_data then
+        warn(string.format("DataModule/ERROR: no data in directory to update inventory for user: %i", user_id))
+        return
+    end
+
+    if current_data._inventory then
+        current_data._inventory = inventory
+    end
 end
 
 return DataModule

@@ -1,0 +1,219 @@
+-- ServerScriptService/ServerMain/TradingModule
+
+--[[
+    Script By: BioEggsHD
+    Handles player item trading
+]]--
+
+--// SERVICES //--
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local HttpService = game:GetService("HttpService")
+
+--// VARIABLES //
+
+local ServerMain = script.Parent
+local SharedUtils = ServerScriptService.SharedUtils
+local DataModule = require(ServerMain.DataModule)
+local ItemsModule = require(ServerMain.InventoryModule.ItemsModule)
+local InventoryModule = require(ServerMain.InventoryModule)
+local LeaderstatsModule = require(ServerMain.LeaderstatsModule)
+
+type TradeSession = {
+    TradeId: string,
+    Active: boolean,
+    Processing: boolean,
+    
+    Player1: {
+        UserId: number,
+        Gems: number,
+        Ready: boolean,
+        Offer: ItemsModule.inventory_type,
+    },
+    Player2: {
+        UserId: number,
+        Gems: number,
+        Ready: boolean,
+        Offer: ItemsModule.inventory_type,
+    }
+}
+
+local ACTIVE_TRADES: {[string]: TradeSession} = {}
+local PLAYER_TO_TRADE: {[number]: string} = {}
+
+--// MODULE //--
+
+local TradingModule = {}
+
+--- Private
+
+local function _UnreadyBoth(session: TradeSession)
+    session.Player1.Ready = false
+    session.Player2.Ready = false
+end
+
+local function _CheckPlayerPresency(player1: number, player2: number): boolean
+    if not (Players:GetPlayerByUserId(player1) and Players:GetPlayerByUserId(player2)) then
+        return false
+    else
+        return true
+    end
+end
+
+--- Public
+
+function TradingModule.CreateTradeSession(player1: number, player2: number)
+    if PLAYER_TO_TRADE[player1] or PLAYER_TO_TRADE[player2] then return end
+    local trade_id = HttpService:GenerateGUID(false)
+    
+    local session: TradeSession = {
+        TradeId = trade_id,
+        Active = true,
+        Processing = false,
+        
+        Player1 = {
+            UserId = player1,
+            Gems = 0,
+            Ready = false,
+            Offer = {
+                Stackable = {}, Unique = {} 
+            },
+        },
+        Player2 = {
+            UserId = player2,
+            Gems = 0,
+            Ready = false,
+            Offer = {
+                Stackable = {}, Unique = {}
+            },
+        }
+    }
+    
+    ACTIVE_TRADES[trade_id] = session
+    PLAYER_TO_TRADE[player1] = trade_id
+    PLAYER_TO_TRADE[player2] = trade_id
+    InventoryModule.LockInventory(player1, true)
+    InventoryModule.LockInventory(player2, true)
+    
+    return trade_id
+end
+
+function TradingModule.CancelTradeSession(trade_id: string)
+    local session: TradeSession = ACTIVE_TRADES[trade_id]
+    if not session or session.Processing then return end
+
+    local player1_uid = session.Player1.UserId
+    local player2_uid = session.Player2.UserId
+    
+    session.Active = false
+    PLAYER_TO_TRADE[player1_uid] = nil
+    PLAYER_TO_TRADE[player2_uid] = nil
+    InventoryModule.LockInventory(player1_uid, false)
+    InventoryModule.LockInventory(player2_uid, false)
+    ACTIVE_TRADES[trade_id] = nil
+end
+
+function TradingModule.OfferChanged(user_id: number)
+    local trade_id: string = PLAYER_TO_TRADE[user_id]
+    if not trade_id then return end
+    local session: TradeSession = ACTIVE_TRADES[trade_id]
+    
+    if session and not session.Processing then
+        _UnreadyBoth(session)
+    end
+end
+
+function TradingModule.Process(trade_id: string)
+    local session: TradeSession = ACTIVE_TRADES[trade_id]
+    if not session or not session.Active or session.Processing then return end
+    
+    local player1_uid: number = session.Player1.UserId
+    local player2_uid: number = session.Player2.UserId
+
+    if _CheckPlayerPresency(player1_uid, player2_uid) == false then
+        warn("TradingModule/ERROR: at least one player left during processing, cancelling")
+        TradingModule.CancelTradeSession(trade_id)
+        return
+    end
+
+    session.Processing = true
+    
+    local player1_inventory = InventoryModule.GetInventory(player1_uid, true)
+    local player2_inventory = InventoryModule.GetInventory(player2_uid, true)
+    local player1_inventory_copy: ItemsModule.inventory_type = InventoryModule.GetInventory(player1_uid, false)
+    local player2_inventory_copy: ItemsModule.inventory_type = InventoryModule.GetInventory(player2_uid, false)
+    local player1_gems: number = LeaderstatsModule.GetStat(player1_uid, "Gems")
+    local player2_gems: number = LeaderstatsModule.GetStat(player2_uid, "Gems")
+
+    -- Verify gemsplayer2_inventory = player2_inventory_copy
+    if session.Player1.Gems > player1_gems or session.Player2.Gems > player2_gems then
+        warn(string.format("TradingModule/ERROR: more gems in trade than actually owned. Player 1: %i, %i, Player 2: %i, %i", player1_gems, session.Player1.Gems, player2_gems, session.Player2.Gems))
+        TradingModule.CancelTradeSession(trade_id)
+        return
+    end
+
+    local function _Verify(uid: number, item_name: string, offer: ItemsModule.inventory_type): boolean
+        if InventoryModule.GetItemCount(uid, item_name) < InventoryModule.GetItemCount(uid, item_name, offer) then
+            warn(string.format("TradingModule/ERROR: cancelling trade because player doesnt own items in offer: %i", uid))
+            TradingModule.CancelTradeSession(trade_id)
+            return false
+        else
+            return true
+        end
+    end
+
+    -- Verify player 1 inventory
+    for item_name: string, item_data: ItemsModule.item_type in session.Player1.Offer.Stackable do
+        if _Verify(player1_uid, item_name, session.Player1.Offer) == false then return end
+    end
+    for index: number, item_data: ItemsModule.item_type in session.Player1.Offer.Unique do
+        local item_name = item_data.Name
+        if _Verify(player1_uid, item_name, session.Player1.Offer) == false then return end
+    end
+    
+    -- Verify player 2 inventory
+    for item_name: string, item_data: ItemsModule.item_type in session.Player2.Offer.Stackable do
+        if _Verify(player2_uid, item_name, session.Player2.Offer) == false then return end
+    end
+    for index: number, item_data: ItemsModule.item_type in session.Player2.Offer.Unique do
+        local item_name = item_data.Name
+        if _Verify(player2_uid, item_name, session.Player2.Offer) == false then return end
+    end
+    
+    local success, errormessage = pcall(function()
+        InventoryModule.RemoveItems(player1_uid, session.Player1.Offer, player1_inventory)
+        InventoryModule.RemoveItems(player2_uid, session.Player2.Offer, player2_inventory)
+        InventoryModule.AddItems(player1_uid, session.Player2.Offer, player1_inventory)
+        InventoryModule.AddItems(player2_uid, session.Player1.Offer, player2_inventory)
+
+        LeaderstatsModule.IncrementNumber(player1_uid, "Gems", session.Player2.Gems - session.Player1.Gems + )
+        LeaderstatsModule.IncrementNumber(player2_uid, "Gems", -session.Player2.Gems + session.Player1.Gems)
+    end)
+    if not success then
+        warn(string.format("TradingModule/ERROR: item or gems exchange failed, recovering %i and %i: %s", player1_uid, player2_uid, errormessage))
+        DataModule.UpdateInventory(player1_uid, player1_inventory_copy)
+        DataModule.UpdateInventory(player2_uid, player2_inventory_copy)
+        LeaderstatsModule.UpdateStat(player1_uid, "Gems", player1_gems)
+        LeaderstatsModule.UpdateStat(player2_uid, "Gems", player2_gems)
+    end
+    
+    TradingModule.CancelTradeSession(trade_id)
+end
+
+return TradingModule
+
+--[[
+
+to be implemented in future:
+- verification against real inventories (DONE)
+- recovery (DONE)
+- state checks (do players still exist, etc) (DONE)
+- trade requests
+- only allow 1 active trade per player (DONE)
+- locking inventories during trades (DONE)
+- rate limiter
+- audit log
+- client replication -> to be done for every single module, this is a massive future task
+
+]]--

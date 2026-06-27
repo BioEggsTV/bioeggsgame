@@ -117,6 +117,7 @@ function OnPlayerAdded(player: Player)
 			end
 		end
 	end)
+
 end
 
 function OnPlayerRemoving(player: Player)
@@ -133,12 +134,23 @@ Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
 game:BindToClose(function()
-	-- Avoid that PlayerRemoving events fire
 	_is_shutting_down = true
 
-	local cleanup_threads = {}
-	for _, player in Players:GetPlayers() do
-		local thread = task.spawn(_CleanupPlayer, player.UserId)
-		table.insert(cleanup_threads, thread)
+	local players = Players:GetPlayers()
+	local remaining = #players
+	if remaining == 0 then return end
+
+	local running_thread = coroutine.running()
+
+	for _, player: Player in players do
+		task.spawn(function()
+			pcall(_CleanupPlayer, player.UserId)
+			remaining -= 1
+			if remaining == 0 then
+				task.spawn(running_thread)
+			end
+		end)
 	end
+
+	coroutine.yield()
 end)

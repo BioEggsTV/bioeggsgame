@@ -79,6 +79,12 @@ local function _IncrementNumber(user_id: number, stat_name: string, value: numbe
 	end
 end
 
+-- Get a player stat value
+local function _GetStat(user_id: number, stat_name: string)
+	if not LEADERSTATS[user_id] then return end
+	return LEADERSTATS[user_id][stat_name] or 0
+end
+
 -- Update a players stat inside of its leaderstats directory
 local function _UpdateStat(user_id: number, stat_name: string, new_value: any)
 	if not LEADERSTATS[user_id] then return end
@@ -105,6 +111,8 @@ end
 function LeaderstatsModule.RemoveLeaderstats(user_id: number)
 	_Wipe(user_id)
 end
+
+LeaderstatsModule.GetStat = _GetStat
 
 LeaderstatsModule.IncrementNumber = _IncrementNumber
 

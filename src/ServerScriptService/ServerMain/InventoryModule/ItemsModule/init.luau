@@ -15,6 +15,7 @@ export type item_type = {
     Type: "Stackable" | "Unique",
     Data: {[string]: any}
 }
+export type inventory_type = {[string]: {[any]: item_type}} -- ["Stackable" | "Unique"]: [item_name | index]: item_data
 
 -- Stackable items use id as index;
 -- Unique items use own Name as index
@@ -34,7 +35,8 @@ ItemsModule.ItemDatabase = {
         Category = "Pets",
         Type = "Unique",
         Data = {
-            Experience = 0
+            Experience = 0,
+            -- _uid = "" <- implement unique items actually being unique
         }
     }
 }
