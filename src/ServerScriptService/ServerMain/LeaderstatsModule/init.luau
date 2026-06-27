@@ -46,8 +46,8 @@ local function _UpdatePlayerLeaderstats(user_id: number)
 				value_instance = Instance.new("BoolValue")
 			end
 			if value_instance then
-				value_instance.Name   = stat_name
-				value_instance.Value  = value
+				value_instance.Name = stat_name
+				value_instance.Value = value
 				value_instance.Parent = leaderstats_folder
 			end
 		end
@@ -80,7 +80,7 @@ local function _IncrementNumber(user_id: number, stat_name: string, value: numbe
 end
 
 -- Get a player stat value
-local function _GetStat(user_id: number, stat_name: string)
+local function _GetStat(user_id: number, stat_name: string): any --> leaderstat value
 	if not LEADERSTATS[user_id] then return end
 	return LEADERSTATS[user_id][stat_name] or 0
 end

@@ -1,10 +1,8 @@
 -- ServerScriptService/ServerMain/BansModule
 
 --[[
-
-Script By: BioEggsHD
-Handles banning of players
-
+    Script By: BioEggsHD
+    Handles banning of players
 ]]--
 
 --// SERVICES //--
@@ -23,7 +21,7 @@ local BansModule = {}
 --- Private
 
 -- Get players saved ban data (if it exists)
-local function _GetData(user_id: number): any
+local function _GetData(user_id: number): any --> user ban data
     local success, result
     for attempt = 1, 3 do
         success, result = pcall(function()
@@ -51,7 +49,7 @@ local function _GetData(user_id: number): any
 end
 
 -- Ban a player
-local function _BanPlayer(user_id: number, duration_hours: number, reason: string, banned_by: string): boolean
+local function _BanPlayer(user_id: number, duration_hours: number, reason: string, banned_by: string): boolean --> whether ban succeeded
     local new_data = {
         is_banned = true,
         banned_at = os.time(),
@@ -75,12 +73,12 @@ local function _BanPlayer(user_id: number, duration_hours: number, reason: strin
             task.wait(2 ^ attempt)
         end
     end
-    warn("BansModule/ERROR: Failed to update data after 3 attempts for user: " .. user_id)
+    warn(string.format("BansModule/ERROR: Failed to ban player after 3 attempts: %i", user_id))
     return false
 end
 
 -- Unban a player
-local function _UnbanPlayer(user_id: number): boolean
+local function _UnbanPlayer(user_id: number): boolean --> whether unban succeeded
     local new_data = {
         is_banned = false,
         banned_at = 0,
@@ -104,7 +102,7 @@ local function _UnbanPlayer(user_id: number): boolean
             task.wait(2 ^ attempt)
         end
     end
-    warn("BansModule/ERROR: Failed to update data after 3 attempts for user: " .. user_id)
+    warn(string.format("BansModule/ERROR: Failed to ban player after 3 attempts: %i", user_id))
     return false
 end
 

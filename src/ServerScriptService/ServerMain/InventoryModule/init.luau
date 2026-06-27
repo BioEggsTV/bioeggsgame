@@ -13,11 +13,11 @@ local ServerScriptService = game:GetService("ServerScriptService")
 --// VARIABLES //--
 
 local SharedUtils = ServerScriptService.SharedUtils
-local TableUtil = require(SharedUtils:FindFirstChild("TableUtil"))
-local ItemsModule = require(script:FindFirstChild("ItemsModule"))
+local TableUtil = require(SharedUtils."TableUtil)
+local ItemUtil = require(script:FindFirstChild("ItemUtil"))
 
 -- Holds references to players _inventory directory inside PLAYER_DATA
-local INVENTORIES: {[number]: ItemsModule.inventory_type} = {} -- [user_id]: _inventory reference
+local INVENTORIES: {[number]: ItemUtil.InventoryType} = {} -- [user_id]: _inventory reference
 
 local LOCKED: {[number]: boolean?} = {} -- [user_id]: inventory locked or not
 
@@ -28,7 +28,7 @@ local InventoryModule = {}
 --- Private
 
 -- Allocate a reference to the players inventory directory
-local function _Allocate(user_id: number, inventory: ItemsModule.inventory_type)
+local function _Allocate(user_id: number, inventory: ItemUtil.InventoryType)
 	if INVENTORIES[user_id] then
 		local player: Player? = Players:GetPlayerByUserId(user_id)
 		local user_name = player and player.Name or "Unknown"
@@ -44,7 +44,7 @@ local function _Wipe(user_id: number)
 end
 
 -- Add an item pool to a players inventory
-local function _AddItems(user_id: number, items: ItemsModule.inventory_type, custom_inventory: ItemsModule.inventory_type?)
+local function _AddItems(user_id: number, items: ItemUtil.InventoryType, custom_inventory: ItemUtil.InventoryType?)
 	if LOCKED[user_id] then return end
 	local inventory = custom_inventory or INVENTORIES[user_id]
 	if not inventory then
@@ -52,21 +52,21 @@ local function _AddItems(user_id: number, items: ItemsModule.inventory_type, cus
 		return
 	end
 
-	for item_name: string, item_data: ItemsModule.item_type in items.Stackable do
-		if not ItemsModule.ItemDatabase[item_name] then
+	for item_name: string, item_data: ItemUtil.ItemType in items.Stackable do
+		if not ItemUtil.ItemDatabase[item_name] then
 			warn(string.format("InventoryModule/ERROR: no such stackable item \"%s\" while adding items to %i; skipping item", item_name, user_id))
 			continue
 		end
 		
 		if not inventory.Stackable[item_name] then
-			inventory.Stackable[item_name] = TableUtil.DeepCopy(item_data) or TableUtil.DeepCopy(ItemsModule.ItemDatabase[item_name])
+			inventory.Stackable[item_name] = TableUtil.DeepCopy(item_data) or TableUtil.DeepCopy(ItemUtil.ItemDatabase[item_name])
 		else
 			inventory.Stackable[item_name].Data.Count += item_data.Data.Count or 0
 		end
 	end
 
-	for index: number, item_data: ItemsModule.item_type in items.Unique do
-		if not ItemsModule.ItemDatabase[item_data.Name] then
+	for index: number, item_data: ItemUtil.ItemType in items.Unique do
+		if not ItemUtil.ItemDatabase[item_data.Name] then
             warn(string.format("InventoryModule/ERROR: no such unique item \"%s\" while adding items to %i; skipping item", item_data.Name, user_id))
 			continue
 		end
@@ -76,7 +76,7 @@ local function _AddItems(user_id: number, items: ItemsModule.inventory_type, cus
 end
 	
 -- Remove items from a players inventory
-local function _RemoveItems(user_id: number, items: ItemsModule.inventory_type, custom_inventory: ItemsModule.inventory_type?)
+local function _RemoveItems(user_id: number, items: ItemUtil.InventoryType, custom_inventory: ItemUtil.InventoryType?)
 	if LOCKED[user_id] then return end
     local inventory = custom_inventory or INVENTORIES[user_id]
     if not inventory then
@@ -85,7 +85,7 @@ local function _RemoveItems(user_id: number, items: ItemsModule.inventory_type, 
     end
 
     if items.Stackable then
-        for item_name: string, item_data: ItemsModule.item_type in items.Stackable do
+        for item_name: string, item_data: ItemUtil.ItemType in items.Stackable do
             local current_item = inventory.Stackable[item_name]
             if current_item then
                 local remove_amount = item_data.Data.Count or 0
@@ -103,19 +103,16 @@ local function _RemoveItems(user_id: number, items: ItemsModule.inventory_type, 
     end
 
     if items.Unique then
-        for index: number, item_data: ItemsModule.item_type in items.Unique do
+        for index: number, item_data: ItemUtil.ItemType in items.Unique do
             local removed = false
-            
             for i = #inventory.Unique, 1, -1 do
                 local current_unique = inventory.Unique[i]
-                
                 if current_unique.Name == item_data.Name then
                     table.remove(inventory.Unique, i)
                     removed = true
                     break
                 end
             end
-            
             if not removed then
                 warn(string.format("InventoryModule/ERROR: unique item \"%s\" not found to remove from: %i", item_data.Name, user_id))
             end
@@ -124,7 +121,7 @@ local function _RemoveItems(user_id: number, items: ItemsModule.inventory_type, 
 end
 
 -- Get a player inventory copy or reference
-local function _GetInventory(user_id: number, by_reference: boolean): ItemsModule.inventory_type?
+local function _GetInventory(user_id: number, by_reference: boolean): ItemUtil.InventoryType? --> players inventory
 	local inventory = INVENTORIES[user_id]
 	if inventory then
 		return by_reference and inventory or TableUtil.DeepCopy(inventory)
@@ -135,18 +132,18 @@ local function _GetInventory(user_id: number, by_reference: boolean): ItemsModul
 end
 
 -- Get item count (stackable) in a players inventory
-local function _GetItemCount(user_id: number, item_name: string, custom_inventory: ItemsModule.inventory_type?): number?
-	local inventory: ItemsModule.inventory_type = custom_inventory or INVENTORIES[user_id]
+local function _GetItemCount(user_id: number, item_name: string, custom_inventory: ItemUtil.InventoryType?): number? --> item count
+	local inventory: ItemUtil.InventoryType = custom_inventory or INVENTORIES[user_id]
 	if not inventory then
         warn(string.format("InventoryModule/ERROR: no player inventory directory: %i", user_id))
 		return nil
 	end
-	local item_data: ItemsModule.item_type? = ItemsModule.ItemDatabase[item_name]
+	local item_data: ItemUtil.ItemType? = ItemUtil.ItemDatabase[item_name]
 	if not item_data then
 		warn(string.format("InventoryModule/ERROR: no such item \"%s\" while getting item count in: %i", item_name, user_id))
 		return nil
 	end
-	local type: string = ItemsModule.ItemDatabase[item_name].Type
+	local type: string = ItemUtil.ItemDatabase[item_name].Type
 	if type == "Stackable" then
 		if not inventory.Stackable[item_name] then
 			warn(string.format("InventoryModule/ERROR: no item \"%s\" in player inventory while getting item count in: %i", item_name, user_id))
@@ -155,7 +152,7 @@ local function _GetItemCount(user_id: number, item_name: string, custom_inventor
 		return inventory.Stackable[item_name].Data.Count or 0
 	else
 		local count = 0
-		for i, item: ItemsModule.item_type in inventory.Unique do
+		for i, item: ItemUtil.ItemType in inventory.Unique do
 			if item.Name == item_name then
 				count += 1
 			end

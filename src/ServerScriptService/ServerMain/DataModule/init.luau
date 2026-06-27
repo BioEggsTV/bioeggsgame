@@ -16,7 +16,7 @@ local DataStoreService = game:GetService("DataStoreService")
 local SharedUtils = ServerScriptService.SharedUtils
 local ServerMain = ServerScriptService.ServerMain
 local TableUtil = require(SharedUtils:FindFirstChild("TableUtil"))
-local ItemsModule = require(ServerMain.InventoryModule.ItemsModule)
+local ItemUtil = require(ServerMain.InventoryModule.ItemUtil)
 
 local MainDataStore = DataStoreService:GetDataStore("MainDataStore_v1")
 local CURRENT_DATA_VERSION = 1
@@ -29,7 +29,7 @@ local DataModule = {}
 
 --- Private
 
-local function _GenerateDefaultData(): {[string]: any}
+local function _GenerateDefaultData(): {[string]: any} --> default data
     return {
         Version = CURRENT_DATA_VERSION,
         SessionId = nil,
@@ -51,7 +51,7 @@ local function _GenerateDefaultData(): {[string]: any}
 end
 
 -- Migrate data across versions
-local function _MigrateData(data: {[string]: any}): {[string]: any}
+local function _MigrateData(data: {[string]: any}): {[string]: any} --> migrated data
     if not data.Version then
         data.Version = 1
     end
@@ -67,7 +67,7 @@ end
 --- Public
 
 -- Return all player data, held by reference in PLAYER_DATA
-function DataModule.GetData(user_id: number): {[string]: any}?
+function DataModule.GetData(user_id: number): {[string]: any}? --> entire data table
     local success, result
     for attempt = 1, 3 do
         success, result = pcall(function()
@@ -110,7 +110,7 @@ function DataModule.GetData(user_id: number): {[string]: any}?
 end
 
 -- Save all player data
-function DataModule.SaveData(user_id: number, release_session: boolean?): boolean
+function DataModule.SaveData(user_id: number, release_session: boolean?): boolean -- whether data save succeeded
     local current_data = PLAYER_DATA[user_id]
     if not current_data then
         warn(string.format("DataModule/ERROR: no data in directory to save for user: %i", user_id))
@@ -150,7 +150,7 @@ function DataModule.SaveData(user_id: number, release_session: boolean?): boolea
 end
 
 -- Modify a player inventory
-function DataModule.UpdateInventory(user_id: number, inventory: ItemsModule.inventory_type)
+function DataModule.UpdateInventory(user_id: number, inventory: ItemUtil.InventoryType)
     local current_data = PLAYER_DATA[user_id]
     if not current_data then
         warn(string.format("DataModule/ERROR: no data in directory to update inventory for user: %i", user_id))

@@ -1,21 +1,19 @@
--- ServerScriptService/ServerMain/InventoryModule/ItemsModule
+-- ServerScriptService/ServerMain/InventoryModule/ItemUtil
 
 --[[
-
-Script By: BioEggsHD
-Database of all item templates
-
+    Script By: BioEggsHD
+    Database of all item templates
 ]]--
 
 local ItemsModule = {}
 
-export type item_type = {
+export type ItemType = {
     Name: string,
     Category: "Boosts" | "Pets",
     Type: "Stackable" | "Unique",
     Data: {[string]: any}
 }
-export type inventory_type = {[string]: {[any]: item_type}} -- ["Stackable" | "Unique"]: [item_name | index]: item_data
+export type InventoryType = {[string]: {[any]: ItemType}} -- ["Stackable" | "Unique"]: [item_name | index]: item_data
 
 -- Stackable items use id as index;
 -- Unique items use own Name as index

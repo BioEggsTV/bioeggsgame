@@ -16,7 +16,7 @@ local HttpService = game:GetService("HttpService")
 local ServerMain = script.Parent
 local SharedUtils = ServerScriptService.SharedUtils
 local DataModule = require(ServerMain.DataModule)
-local ItemsModule = require(ServerMain.InventoryModule.ItemsModule)
+local ItemUtil = require(ServerMain.InventoryModule.ItemUtil)
 local InventoryModule = require(ServerMain.InventoryModule)
 local LeaderstatsModule = require(ServerMain.LeaderstatsModule)
 
@@ -29,13 +29,13 @@ type TradeSession = {
         UserId: number,
         Gems: number,
         Ready: boolean,
-        Offer: ItemsModule.inventory_type,
+        Offer: ItemUtil.InventoryType,
     },
     Player2: {
         UserId: number,
         Gems: number,
         Ready: boolean,
-        Offer: ItemsModule.inventory_type,
+        Offer: ItemUtil.InventoryType,
     }
 }
 
@@ -53,7 +53,7 @@ local function _UnreadyBoth(session: TradeSession)
     session.Player2.Ready = false
 end
 
-local function _CheckPlayerPresency(player1: number, player2: number): boolean
+local function _CheckPlayerPresency(player1: number, player2: number): boolean --> whether both players are in server
     if not (Players:GetPlayerByUserId(player1) and Players:GetPlayerByUserId(player2)) then
         return false
     else
@@ -63,8 +63,8 @@ end
 
 --- Public
 
-function TradingModule.CreateTradeSession(player1: number, player2: number)
-    if PLAYER_TO_TRADE[player1] or PLAYER_TO_TRADE[player2] then return end
+function TradingModule.CreateTradeSession(player1: number, player2: number): string --> new trade id
+    if PLAYER_TO_TRADE[player1] or PLAYER_TO_TRADE[player2] then return "" end
     local trade_id = HttpService:GenerateGUID(false)
     
     local session: TradeSession = {
@@ -141,19 +141,12 @@ function TradingModule.Process(trade_id: string)
     
     local player1_inventory = InventoryModule.GetInventory(player1_uid, true)
     local player2_inventory = InventoryModule.GetInventory(player2_uid, true)
-    local player1_inventory_copy: ItemsModule.inventory_type = InventoryModule.GetInventory(player1_uid, false)
-    local player2_inventory_copy: ItemsModule.inventory_type = InventoryModule.GetInventory(player2_uid, false)
+    local player1_inventory_copy: ItemUtil.InventoryType = InventoryModule.GetInventory(player1_uid, false)
+    local player2_inventory_copy: ItemUtil.InventoryType = InventoryModule.GetInventory(player2_uid, false)
     local player1_gems: number = LeaderstatsModule.GetStat(player1_uid, "Gems")
     local player2_gems: number = LeaderstatsModule.GetStat(player2_uid, "Gems")
 
-    -- Verify gemsplayer2_inventory = player2_inventory_copy
-    if session.Player1.Gems > player1_gems or session.Player2.Gems > player2_gems then
-        warn(string.format("TradingModule/ERROR: more gems in trade than actually owned. Player 1: %i, %i, Player 2: %i, %i", player1_gems, session.Player1.Gems, player2_gems, session.Player2.Gems))
-        TradingModule.CancelTradeSession(trade_id)
-        return
-    end
-
-    local function _Verify(uid: number, item_name: string, offer: ItemsModule.inventory_type): boolean
+    local function _VerifyInventory(uid: number, item_name: string, offer: ItemUtil.InventoryType): boolean --> whether player owns items
         if InventoryModule.GetItemCount(uid, item_name) < InventoryModule.GetItemCount(uid, item_name, offer) then
             warn(string.format("TradingModule/ERROR: cancelling trade because player doesnt own items in offer: %i", uid))
             TradingModule.CancelTradeSession(trade_id)
@@ -163,22 +156,26 @@ function TradingModule.Process(trade_id: string)
         end
     end
 
-    -- Verify player 1 inventory
-    for item_name: string, item_data: ItemsModule.item_type in session.Player1.Offer.Stackable do
-        if _Verify(player1_uid, item_name, session.Player1.Offer) == false then return end
+    if session.Player1.Gems > player1_gems or session.Player2.Gems > player2_gems then
+        warn(string.format("TradingModule/ERROR: more gems in trade than actually owned. Player 1: %i, %i, Player 2: %i, %i", player1_gems, session.Player1.Gems, player2_gems, session.Player2.Gems))
+        TradingModule.CancelTradeSession(trade_id)
+        return
     end
-    for index: number, item_data: ItemsModule.item_type in session.Player1.Offer.Unique do
+
+    for item_name: string, item_data: ItemUtil.ItemType in session.Player1.Offer.Stackable do
+        if _VerifyInventory(player1_uid, item_name, session.Player1.Offer) == false then return end
+    end
+    for index: number, item_data: ItemUtil.ItemType in session.Player1.Offer.Unique do
         local item_name = item_data.Name
-        if _Verify(player1_uid, item_name, session.Player1.Offer) == false then return end
+        if _VerifyInventory(player1_uid, item_name, session.Player1.Offer) == false then return end
     end
     
-    -- Verify player 2 inventory
-    for item_name: string, item_data: ItemsModule.item_type in session.Player2.Offer.Stackable do
-        if _Verify(player2_uid, item_name, session.Player2.Offer) == false then return end
+    for item_name: string, item_data: ItemUtil.ItemType in session.Player2.Offer.Stackable do
+        if _VerifyInventory(player2_uid, item_name, session.Player2.Offer) == false then return end
     end
-    for index: number, item_data: ItemsModule.item_type in session.Player2.Offer.Unique do
+    for index: number, item_data: ItemUtil.ItemType in session.Player2.Offer.Unique do
         local item_name = item_data.Name
-        if _Verify(player2_uid, item_name, session.Player2.Offer) == false then return end
+        if _VerifyInventory(player2_uid, item_name, session.Player2.Offer) == false then return end
     end
     
     local success, errormessage = pcall(function()
@@ -214,6 +211,8 @@ to be implemented in future:
 - locking inventories during trades (DONE)
 - rate limiter
 - audit log
+- unique items being unique
+
 - client replication -> to be done for every single module, this is a massive future task
 
 ]]--

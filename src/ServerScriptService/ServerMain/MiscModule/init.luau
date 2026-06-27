@@ -68,7 +68,7 @@ function MiscModule.RemoveMisc(user_id: number)
 end
 
 -- Get a misc stat for a player
-function MiscModule.GetStat(user_id: number, player_data: {[string]: any}, stat_name: string): any
+function MiscModule.GetStat(user_id: number, player_data: {[string]: any}, stat_name: string): any --> stat value
 	if not player_data or not player_data._misc then
 		warn(string.format("MiscModule/ERROR: no _misc data found for user: %i", user_id))
 		return nil

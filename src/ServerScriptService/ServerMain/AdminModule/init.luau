@@ -16,7 +16,7 @@ local ADMIN_WHITELIST: {[number]: boolean} = {
 	[5767632793] = true, -- RichtiginderRitze (Winevobro)
 }
 
-local AdminUI = script:WaitForChild("AdminUI")
+local AdminUI = script.AdminUI
 
 --// MODULE //--
 
@@ -25,17 +25,17 @@ local AdminModule = {}
 --- Private
 
 -- Check if a player is an admin using their user id
-local function IsPlayerAdmin(user_id: number): boolean
+local function _IsPlayerAdmin(user_id: number): boolean --> whether player is an admin
 	return (ADMIN_WHITELIST[user_id] == true)
 end
 
 --- Public
 
--- Add the admin ui to the players interface, if they are admin
-function AdminModule.AddAdminUI(user_id: number): boolean
+-- Add the admin ui to the players interface if they are admin
+function AdminModule.AddAdminUI(user_id: number): boolean --> whether player is admin
 	local player: Player = Players:GetPlayerByUserId(user_id)
 	if player then
-		if not IsPlayerAdmin(user_id) then return false end
+		if not _IsPlayerAdmin(user_id) then return false end
 
 		local player_gui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 5)
 		if player_gui then
