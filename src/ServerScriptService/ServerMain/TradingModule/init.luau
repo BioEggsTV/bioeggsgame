@@ -183,9 +183,8 @@ function TradingModule.Process(trade_id: string)
         InventoryModule.RemoveItems(player2_uid, session.Player2.Offer, player2_inventory)
         InventoryModule.AddItems(player1_uid, session.Player2.Offer, player1_inventory)
         InventoryModule.AddItems(player2_uid, session.Player1.Offer, player2_inventory)
-
-        LeaderstatsModule.IncrementNumber(player1_uid, "Gems", session.Player2.Gems - session.Player1.Gems + )
-        LeaderstatsModule.IncrementNumber(player2_uid, "Gems", -session.Player2.Gems + session.Player1.Gems)
+        LeaderstatsModule.IncrementNumber(player1_uid, "Gems", session.Player2.Gems - session.Player1.Gems)
+        LeaderstatsModule.IncrementNumber(player2_uid, "Gems", session.Player1.Gems - session.Player2.Gems)
     end)
     if not success then
         warn(string.format("TradingModule/ERROR: item or gems exchange failed, recovering %i and %i: %s", player1_uid, player2_uid, errormessage))
