@@ -43,6 +43,10 @@ local function _GenerateDefaultData(): {[string]: any} --> default data
             Playtime = 0
         },
 
+        _settings = {
+            RecieveRequests = true
+        }
+
         _inventory = {
             Stackable = {},
             Unique = {}

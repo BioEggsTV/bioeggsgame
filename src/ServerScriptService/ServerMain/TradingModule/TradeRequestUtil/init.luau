@@ -13,13 +13,14 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 --// VARIABLES //--
 
+local ServerMain = ServerScriptService.ServerMain
 local SharedUtils = ServerScriptService.SharedUtils
-local TableUtil = require(SharedUtils.TableUtil)
+local SettingsModule = require(ServerMain.SettingsModule)
 local TradingModule = require(script.Parent)
+local TableUtil = require(SharedUtils.TableUtil)
 
 local Remotes: Folder = ReplicatedStorage.Remotes
 local TradeRequestRemote: RemoteEvent = Remotes.TradeRequest
-local PlayerSettingsFunction: RemoteFunction = Remotes.PlayerSettings
 
 local REQUESTS: {[number]: {number}} = {}
 
@@ -29,8 +30,16 @@ local TradeRequestUtil = {}
 
 --- Private
 
-local function _PlayerInGame(player: number): boolean, Player? --> whether player is in game, player instance
-    local plr: Player? = Players:GetPlayerByUserId(player)
+local function _Allocate(user_id: number)
+    REQUESTS[user_id] = {}
+end
+
+local function _Wipe(user_id: number)
+    REQUESTS[user_id] = nil
+end
+
+local function _PlayerInGame(user_id: number): boolean, Player? --> whether player is in game, player instance
+    local plr: Player? = Players:GetPlayerByUserId(user_id)
     if plr then
         return true, plr
     else
@@ -38,7 +47,7 @@ local function _PlayerInGame(player: number): boolean, Player? --> whether playe
     end
 end
 
-local function _AttemptSendPayload(player: number, result: string, extra: {[string]: any}?)
+local function _AttemptSendPayload(user_id: number, result: string, extra: {[string]: any}?)
     local payload = {
         Action = "TradeRequest",
         Result = result
@@ -48,9 +57,9 @@ local function _AttemptSendPayload(player: number, result: string, extra: {[stri
             payload[k] = v
         end
     end
-    local is_in_game: boolean, plr: Player? = _PlayerInGame(player)
+    local is_in_game: boolean, player: Player? = _PlayerInGame(user_id)
     if is_in_game then
-        TradeRequestRemote:FireClient(plr, payload)
+        TradeRequestRemote:FireClient(player, payload)
     end
 end
 
@@ -62,7 +71,7 @@ local function _SendTradeRequest(player: number, request_to: number): string -->
         return "TargetLeft"
     end
     
-    local recieve_requests: boolean = PlayerSettings:InvokeClient(request_to, "RecieveRequests")
+    local recieve_requests: boolean = SettingsModule.GetSetting(request_to, "RecieveRequests")
     if recieve_requests == false then
         return "RequestsDisabled"
     end
@@ -70,7 +79,6 @@ local function _SendTradeRequest(player: number, request_to: number): string -->
     task.delay(60, function()
         local expired = TableUtil.RemoveFirst(REQUESTS[player], request_to)
         if expired then
-            table.remove(REQUESTS[player], index)
             _AttemptSendPayload(player, "RequestExpired", {
                 Mode = "To",
                 Player = request_to
@@ -93,7 +101,7 @@ local function _InteractRequest(player: number, request_from: number, accept: bo
     TableUtil.RemoveFirst(REQUESTS[request_from], player)
 
     if not _PlayerInGame(player) then
-        if _PlayerInGame(requst_from) then
+        if _PlayerInGame(request_from) then
             return "TargetLeft"
         end
     end
@@ -111,6 +119,10 @@ local function _InteractRequest(player: number, request_from: number, accept: bo
 end
 
 --- Public
+
+TradeRequestUtil.Allocate = _Allocate
+
+TradeRequestUtil.Wipe = _Wipe
 
 function TradeRequestUtil.SendTradeRequest(player: number, request_to: number)
     local result = _SendTradeRequest(player, request_to)

@@ -7,9 +7,9 @@
 
 --// SERVICES //--
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
-local HttpService = game:GetService("HttpService")
 
 --// VARIABLES //
 
@@ -169,7 +169,6 @@ function TradingModule.Process(trade_id: string)
         local item_name = item_data.Name
         if _VerifyInventory(player1_uid, item_name, session.Player1.Offer) == false then return end
     end
-    
     for item_name: string, item_data: ItemUtil.ItemType in session.Player2.Offer.Stackable do
         if _VerifyInventory(player2_uid, item_name, session.Player2.Offer) == false then return end
     end
@@ -177,7 +176,7 @@ function TradingModule.Process(trade_id: string)
         local item_name = item_data.Name
         if _VerifyInventory(player2_uid, item_name, session.Player2.Offer) == false then return end
     end
-    
+
     local success, errormessage = pcall(function()
         InventoryModule.RemoveItems(player1_uid, session.Player1.Offer, player1_inventory)
         InventoryModule.RemoveItems(player2_uid, session.Player2.Offer, player2_inventory)
@@ -205,7 +204,7 @@ to be implemented in future:
 - verification against real inventories (DONE)
 - recovery (DONE)
 - state checks (do players still exist, etc) (DONE)
-- trade requests
+- trade requests (DONE)
 - only allow 1 active trade per player (DONE)
 - locking inventories during trades (DONE)
 - rate limiter

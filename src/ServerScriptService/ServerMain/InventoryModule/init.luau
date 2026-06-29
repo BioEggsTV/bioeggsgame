@@ -13,7 +13,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 --// VARIABLES //--
 
 local SharedUtils = ServerScriptService.SharedUtils
-local TableUtil = require(SharedUtils."TableUtil)
+local TableUtil = require(SharedUtils.TableUtil)
 local ItemUtil = require(script:FindFirstChild("ItemUtil"))
 
 -- Holds references to players _inventory directory inside PLAYER_DATA

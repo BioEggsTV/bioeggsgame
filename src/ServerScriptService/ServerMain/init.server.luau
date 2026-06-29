@@ -18,6 +18,9 @@ local DataModule = require(script.DataModule)
 local InventoryModule = require(script.InventoryModule)
 local LeaderstatsModule = require(script.LeaderstatsModule)
 local MiscModule = require(script.MiscModule)
+local SettingsModule = reuqire(script.SettingsModule)
+local TradingModule = require(script.TradingModule)
+local TradeRequestUtil = require(script.TradingModule.TradeRequestUtil)
 
 local _is_shutting_down: boolean = false
 
@@ -43,7 +46,6 @@ local function _CleanupPlayer(user_id: number)
 
 	-- Finalize misc stats
 	MiscModule.UpdatePlaytime(user_id, player_data)
-	MiscModule.OnPlayerRemoving(user_id)
 
 	-- Save all player data
 	DataModule.SaveData(user_id, true)
@@ -52,6 +54,8 @@ local function _CleanupPlayer(user_id: number)
 	MiscModule.RemoveMisc(user_id)
 	LeaderstatsModule.RemoveLeaderstats(user_id)
 	InventoryModule.RemoveInventory(user_id)
+	SettingsModule.RemoveSettings(user_id)
+	TradeRequestUtil.Wipe(user_id)
 end
 
 --- Callback
@@ -95,6 +99,8 @@ function OnPlayerAdded(player: Player)
 	MiscModule.CreateMisc(user_id, player_data)
 	LeaderstatsModule.CreateLeaderstats(user_id, player_data)
 	InventoryModule.CreateInventory(user_id, player_data)
+	SettingsModule.CreateSettings(user_id, player_data)
+	TradeRequestUtil.Allocate(user_id)
 
 	-- Check if player left during initialization
 	if not Players:GetPlayerByUserId(user_id) then
