@@ -183,8 +183,8 @@ function TradingModule.Process(trade_id: string)
     end
 
     local success, errormessage = pcall(function()
-        InventoryModule.RemoveItems(player1_uid, session.Player1.Offer)
-        InventoryModule.RemoveItems(player2_uid, session.Player2.Offer)
+        InventoryModule.RemoveItems(player1_uid, session.Player1.Offer, nil, true)
+        InventoryModule.RemoveItems(player2_uid, session.Player2.Offer, nil, true)
         InventoryModule.AddItems(player1_uid, session.Player2.Offer, nil, true)
         InventoryModule.AddItems(player2_uid, session.Player1.Offer, nil, true)
         LeaderstatsModule.IncrementNumber(player1_uid, "Gems", session.Player2.Gems - session.Player1.Gems)
