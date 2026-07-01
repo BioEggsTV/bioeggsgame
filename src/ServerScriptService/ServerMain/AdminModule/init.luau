@@ -11,10 +11,7 @@ local Players = game:GetService("Players")
 
 --// VARIABLES //--
 
-local ADMIN_WHITELIST: {[number]: boolean} = {
-	[1210462714] = true, -- Aqwertz333 (BioEggsHD),
-	[5767632793] = true, -- RichtiginderRitze (Winevobro)
-}
+local GAME_GROUP: number = 14664496
 
 local AdminUI = script.AdminUI
 
@@ -25,31 +22,35 @@ local AdminModule = {}
 --- Private
 
 -- Check if a player is an admin using their user id
-local function _IsPlayerAdmin(user_id: number): boolean --> whether player is an admin
-	return (ADMIN_WHITELIST[user_id] == true)
+local function _IsPlayerAdmin(player: Player): boolean
+    local success, result = pcall(function()
+        local role = player:GetRoleInGroupAsync(GAME_GROUP)
+        return role == "Owner" or role == "Admin"
+    end)
+    return success and result
+end
+
+-- Add the admin ui to the players interface if they are admin
+local function _AddAdminUI(player: Player)
+	if not _IsPlayerAdmin(player) then return end
+	
+	local user_id: number = player.UserId
+
+	local player_gui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 5)
+	if player_gui then
+		local new_admin_ui = AdminUI:Clone()
+		new_admin_ui.Parent = player_gui
+	else
+        warn(string.format("ERROR: AdminModule/failed to find PlayerGui for player: %s", player.Name))
+	end
+
+	return
 end
 
 --- Public
 
--- Add the admin ui to the players interface if they are admin
-function AdminModule.AddAdminUI(user_id: number): boolean --> whether player is admin
-	local player: Player = Players:GetPlayerByUserId(user_id)
-	if player then
-		if not _IsPlayerAdmin(user_id) then return false end
-
-		local player_gui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 5)
-		if player_gui then
-			local new_admin_ui = AdminUI:Clone()
-			new_admin_ui.Parent = player_gui
-		else
-            warn(string.format("ERROR: AdminModule/failed to find PlayerGui for player: %s", player.Name))
-		end
-
-		return true
-	end
-
-    warn(string.format("ERROR: AdminModule/failed to find Player instance for user id: %i", user_id))
-	return false
+function AdminModule.OnPlayerAdded(player: Player)
+	_AddAdminUI(player)
 end
 
 return AdminModule

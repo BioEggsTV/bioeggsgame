@@ -15,6 +15,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local ServerMain = ServerScriptService.ServerMain
 local SharedUtils = ServerScriptService.SharedUtils
+local NetworkBridge = require(ServerMain.NetworkBridge)
 local SettingsModule = require(ServerMain.SettingsModule)
 local TradingModule = require(script.Parent)
 local TableUtil = require(SharedUtils.TableUtil)
@@ -47,24 +48,8 @@ local function _PlayerInGame(user_id: number): boolean, Player? --> whether play
     end
 end
 
-local function _AttemptSendPayload(user_id: number, result: string, extra: {[string]: any}?)
-    local payload = {
-        Action = "TradeRequest",
-        Result = result
-    }
-    if extra then
-        for k: string, v: any in extra do
-            payload[k] = v
-        end
-    end
-    local is_in_game: boolean, player: Player? = _PlayerInGame(user_id)
-    if is_in_game then
-        TradeRequestRemote:FireClient(player, payload)
-    end
-end
-
-local function _SendTradeRequest(player: number, request_to: number): string --> trade request result: AlreadySent, RequestSent, RequestsDisabled, RequestExpired, TargetLeft
-    if table.find(REQUESTS[player], request_to) then
+local function _SendTradeRequest(user_id: number, request_to: number): string --> trade request result: AlreadySent, RequestSent, RequestsDisabled, RequestExpired, TargetLeft
+    if table.find(REQUESTS[user_id], request_to) then
         return "AlreadySent"
     end
     if not _PlayerInGame(request_to) then
@@ -77,36 +62,36 @@ local function _SendTradeRequest(player: number, request_to: number): string -->
     end
 
     task.delay(60, function()
-        local expired = TableUtil.RemoveFirst(REQUESTS[player], request_to)
+        local expired
+        if REQUESTS[user_id] then
+            expired = TableUtil.RemoveFirst(REQUESTS[user_id], request_to)
+        end
         if expired then
-            _AttemptSendPayload(player, "RequestExpired", {
-                Mode = "To",
-                Player = request_to
-            })
-            _AttemptSendPayload(request_to, "RequestExpired", {
-                Mode = "From",
-                Player = player
+            NetworkBridge.AttemptReplication({user_id, request_to}, "TradeRequestUtil", "TradeRequestCreation", {
+                From = user_id,
+                To = request_to,
+                Result = "RequestExpired"
             })
         end
     end)
 
-    table.insert(REQUESTS[player], request_to)
+    table.insert(REQUESTS[user_id], request_to)
     return "RequestSent"
 end
 
-local function _InteractRequest(player: number, request_from: number, accept: boolean): string --> request interaction result: TargetLeft, PlayerLeft, RequestAccepted, RequestDenied, NoRequest
-    if not REQUESTS[request_from] or not table.find(REQUESTS[request_from], player) then
+local function _InteractRequest(user_id: number, request_from: number, accept: boolean): string --> request interaction result: TargetLeft, PlayerLeft, RequestAccepted, RequestDenied, NoRequest
+    if not REQUESTS[request_from] or not table.find(REQUESTS[request_from], user_id) then
         return "NoRequest"
     end
-    TableUtil.RemoveFirst(REQUESTS[request_from], player)
+    TableUtil.RemoveFirst(REQUESTS[request_from], user_id)
 
-    if not _PlayerInGame(player) then
+    if not _PlayerInGame(user_id) then
         if _PlayerInGame(request_from) then
             return "TargetLeft"
         end
     end
     if not _PlayerInGame(request_from) then
-        if _PlayerInGame(player) then
+        if _PlayerInGame(user_id) then
             return "PlayerLeft"
         end
     end
@@ -120,22 +105,36 @@ end
 
 --- Public
 
-TradeRequestUtil.Allocate = _Allocate
-
-TradeRequestUtil.Wipe = _Wipe
-
-function TradeRequestUtil.SendTradeRequest(player: number, request_to: number)
-    local result = _SendTradeRequest(player, request_to)
-    _AttemptSendPayload(player, result)
+function TradeRequestUtil.OnPlayerAdded(player: Player)
+    _Allocate(player.UserId)
 end
 
-function TradeRequestUtil.InteractRequest(player: number, request_from: number, accept: boolean)
-    local result = _InteractRequest(player, request_from, accept)
+function TradeRequestUtil.OnPlayerRemoving(user_id: number)
+    _Wipe(user_id)
+end
+
+function TradeRequestUtil.SendTradeRequest(user_id: number, request_to: number)
+    local result = _SendTradeRequest(user_id, request_to)
+    local targets: {number} = if result == "RequestSent" then {user_id, request_to} else {user_id}
+    NetworkBridge.AttemptReplication(targets, "TradeRequestUtil", "TradeRequestCreation", {
+        From = user_id,
+        To = request_to,
+        Result = result
+    })
+end
+
+function TradeRequestUtil.InteractRequest(user_id: number, request_from: number, accept: boolean)
+    local result = _InteractRequest(user_id, request_from, accept)
+    local player_table = {user_id, request_from}
+
     if result == "RequestAccepted" then
-        -- create trade session (tbd)
-    else
-        _AttemptSendPayload(request_from, result)
+        local trade_id = TradingModule.CreateTradeSession(request_from, user_id)
     end
+    NetworkBridge.AttemptReplication(player_table, "TradeRequestUtil", "TradeRequestInteraction", {
+        From = request_from,
+        To = user_id,
+        Result = result
+    })
 end
 
 return TradeRequestUtil
@@ -143,5 +142,5 @@ return TradeRequestUtil
 --[[
     To implement:
     - toggle recieving trade requests setting (DONE)
-    - client replication -> (BACKEND DONE)
+    - client replication -> (DONE)
 ]]--

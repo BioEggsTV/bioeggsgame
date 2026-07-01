@@ -11,51 +11,53 @@ local Players = game:GetService("Players")
 
 --// VARIABLES //--
 
--- Modules
-local AdminModule = require(script.AdminModule)
 local BansModule = require(script.BansModule)
 local DataModule = require(script.DataModule)
-local InventoryModule = require(script.InventoryModule)
-local LeaderstatsModule = require(script.LeaderstatsModule)
-local MiscModule = require(script.MiscModule)
-local SettingsModule = reuqire(script.SettingsModule)
-local TradingModule = require(script.TradingModule)
-local TradeRequestUtil = require(script.TradingModule.TradeRequestUtil)
 
 local _is_shutting_down: boolean = false
+local _auto_save_thread: thread
 
---// Functions //--
+type PlayerCallback: (player: Player | number, player_data: {[string]: any}) -> ()
+local OnPlayerAddedFunctions: {PlayerCallback} = {}
+local OnPlayerRemovingFunctions: {PlayerCallback} = {}
+local OnServerStartFunctions: {() -> ()} = {}
+
+--// Functions //--PlayerRemovingHooks
 
 --- Utility
 
--- Formats a seconds value into a one decimal hour string
-local function _FormatSecondsToHour(seconds: number): string --> the formatted string
-	return tostring(math.floor(seconds / 3600 * 10) / 10) .. "h"
+-- Add all module player adding / removing functions to the tables
+local function _DiscoverModules()
+	for _, child in script:GetDescendants() do
+		if child:IsA("ModuleScript") and child ~= DataModule and child ~= BansModule then
+			local success, module = pcall(require, child)
+			if success and typeof(module) == "table" then
+				if typeof(module.OnPlayerAdded) == "function" then
+					table.insert(OnPlayerAddedFunctions, module.OnPlayerAdded)
+				end
+				
+				if typeof(module.OnPlayerRemoving) == "function" then
+					table.insert(OnPlayerRemovingFunctions, module.OnPlayerRemoving)
+				end
+
+				if typeof(module.OnServerStart) == "function" then
+					table.insert(OnServerStartFunctions, module.OnServerStart)
+				end
+			end
+		end
+	end
 end
 
 -- Cleanup player
 local function _CleanupPlayer(user_id: number)
-	local player_data = DataModule.GetData(user_id)
-	if not player_data then
-		-- Data was never loaded
-		MiscModule.RemoveMisc(user_id)
-		LeaderstatsModule.RemoveLeaderstats(user_id)
-		InventoryModule.RemoveInventory(user_id)
-		return
+	local player_data = DataModule.GetCachedData(user_id)
+	for _, callback: PlayerCallback in OnPlayerRemovingFunctions do
+		pcall(callback, user_id, player_data)
 	end
 
-	-- Finalize misc stats
-	MiscModule.UpdatePlaytime(user_id, player_data)
-
-	-- Save all player data
-	DataModule.SaveData(user_id, true)
-
-	-- Clean up all module directories
-	MiscModule.RemoveMisc(user_id)
-	LeaderstatsModule.RemoveLeaderstats(user_id)
-	InventoryModule.RemoveInventory(user_id)
-	SettingsModule.RemoveSettings(user_id)
-	TradeRequestUtil.Wipe(user_id)
+	if player_data then
+		DataModule.SaveData(user_id, true)
+	end
 end
 
 --- Callback
@@ -64,72 +66,45 @@ function OnPlayerAdded(player: Player)
 	local user_name: string, user_id: number = player.Name, player.UserId
 	print(string.format("ServerMain/Player added: %s, %i", user_name, user_id))
 
-	-- Add admin ui if the player is an admin
-	local is_admin = AdminModule.AddAdminUI(user_id)
-
-	-- Check if the player is banned (bypassed by admins)
-	if not is_admin then
-		local ban_data = BansModule.GetData(user_id)
-		if ban_data == nil then
-			warn(string.format("ServerMain/ERROR: Failed getting ban data for user: %s, %i", user_name, user_id))
-			return
-		end
-		if ban_data and ban_data ~= "NO_DATA" then
-			if ban_data.is_banned == true then
-				print(string.format("ServerMain/Kicking banned player: %s, %i", user_name, user_id))
-				player:Kick(string.format(
-					"You were banned from this game.\nRemaining time: %s\nReason: %s",
-					_FormatSecondsToHour(ban_data.banned_until - os.time()),
-					ban_data.reason
-				))
-				return
-			else
-				if ban_data.banned_until ~= 0 and ban_data.banned_until <= os.time() then
-					BansModule.UnbanPlayer(user_id)
-				end
-			end
-		end
-	end
-
+	-- Check if player is banned
+	task.spawn(BansModule.OnPlayerAdded, player)
+	
 	-- Load all player data
 	local player_data = DataModule.GetData(user_id) -- Reference inside DataModule
 	if not player_data then return end
 
-	-- Initialize all modules
-	MiscModule.CreateMisc(user_id, player_data)
-	LeaderstatsModule.CreateLeaderstats(user_id, player_data)
-	InventoryModule.CreateInventory(user_id, player_data)
-	SettingsModule.CreateSettings(user_id, player_data)
-	TradeRequestUtil.Allocate(user_id)
-
-	-- Check if player left during initialization
-	if not Players:GetPlayerByUserId(user_id) then
-		_CleanupPlayer(user_id)
-	end
-
-	-- Update playtime every 60 seconds
 	task.spawn(function()
-		while player.Parent do
-			task.wait(60)
-			if player.Parent then
-				MiscModule.UpdatePlaytime(user_id, player_data)
+		for _, callback: PlayerCallback in OnPlayerAddedFunctions do
+			local success, errormessage = pcall(callback, player, player_data)
+			if not success then
+				warn(string.format("ServerMain/ERROR: Error during initialization for user %i: %s", user_id, tostring(errormessage)))
 			end
 		end
-	end)
 
+		-- Check if player left during initialization
+		if not Players:GetPlayerByUserId(user_id) then
+			_CleanupPlayer(user_id)
+		end
+	end)
 end
 
 function OnPlayerRemoving(player: Player)
 	if _is_shutting_down then return end -- Skip if BindToClose already handled cleanup
-
-	local user_id = player.UserId
-	_CleanupPlayer(user_id)
+	_CleanupPlayer(player.UserId)
 end
 
---// EVENTS //--
+--// MAIN //--
+
+_DiscoverModules()
 
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
+
+for _, callback: () -> () in OnServerStartFunctions do
+	pcall(callback)
+end
+
+_auto_save_thread = DataModule.StartAutoSave()
 
 game:BindToClose(function()
 	_is_shutting_down = true
@@ -137,6 +112,7 @@ game:BindToClose(function()
 	local players = Players:GetPlayers()
 	local remaining = #players
 	if remaining == 0 then return end
+	task.cancel(_auto_save_thread)
 
 	local running_thread = coroutine.running()
 

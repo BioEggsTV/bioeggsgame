@@ -139,16 +139,23 @@ function TradingModule.Process(trade_id: string)
 
     session.Processing = true
     
-    local player1_inventory = InventoryModule.GetInventory(player1_uid, true)
-    local player2_inventory = InventoryModule.GetInventory(player2_uid, true)
     local player1_inventory_copy: ItemUtil.InventoryType = InventoryModule.GetInventory(player1_uid, false)
     local player2_inventory_copy: ItemUtil.InventoryType = InventoryModule.GetInventory(player2_uid, false)
     local player1_gems: number = LeaderstatsModule.GetStat(player1_uid, "Gems")
     local player2_gems: number = LeaderstatsModule.GetStat(player2_uid, "Gems")
 
-    local function _VerifyInventory(uid: number, item_name: string, offer: ItemUtil.InventoryType): boolean --> whether player owns items
-        if InventoryModule.GetItemCount(uid, item_name) < InventoryModule.GetItemCount(uid, item_name, offer) then
-            warn(string.format("TradingModule/ERROR: cancelling trade because player doesnt own items in offer: %i", uid))
+    local function _VerifyStackable(user_id: number, item_name: string, offer: ItemUtil.InventoryType): boolean --> whether player owns items
+        if InventoryModule.GetItemCount(user_id, item_name) < (offer.Stackable[item_name].Data.Count or 0) then
+            warn(string.format("TradingModule/ERROR: cancelling trade because player doesnt own stackable items in offer: %i", user_id))
+            TradingModule.CancelTradeSession(trade_id)
+            return false
+        else
+            return true
+        end
+    end
+    local function _VerifyUnique(user_id: number, guid: string): boolean --> whether player owns unique item
+        if not InventoryModule.HasUniqueItem(user_id, guid) then
+            warn(string.format("TradingModule/ERROR: cancelling trade because player doesnt own unique item in offer: %i (%s)", user_id, guid))
             TradingModule.CancelTradeSession(trade_id)
             return false
         else
@@ -162,26 +169,24 @@ function TradingModule.Process(trade_id: string)
         return
     end
 
-    for item_name: string, item_data: ItemUtil.ItemType in session.Player1.Offer.Stackable do
-        if _VerifyInventory(player1_uid, item_name, session.Player1.Offer) == false then return end
+    for item_name: string, _ in session.Player1.Offer.Stackable do
+        if _VerifyStackable(player1_uid, item_name, session.Player1.Offer) == false then return end
     end
-    for index: number, item_data: ItemUtil.ItemType in session.Player1.Offer.Unique do
-        local item_name = item_data.Name
-        if _VerifyInventory(player1_uid, item_name, session.Player1.Offer) == false then return end
+    for guid: string, _ in session.Player1.Offer.Unique do
+        if _VerifyUnique(player1_uid, guid) == false then return end
     end
-    for item_name: string, item_data: ItemUtil.ItemType in session.Player2.Offer.Stackable do
-        if _VerifyInventory(player2_uid, item_name, session.Player2.Offer) == false then return end
+    for item_name: string, _ in session.Player2.Offer.Stackable do
+        if _VerifyStackable(player2_uid, item_name, session.Player2.Offer) == false then return end
     end
-    for index: number, item_data: ItemUtil.ItemType in session.Player2.Offer.Unique do
-        local item_name = item_data.Name
-        if _VerifyInventory(player2_uid, item_name, session.Player2.Offer) == false then return end
+    for guid: string, _ in session.Player2.Offer.Unique do
+        if _VerifyUnique(player2_uid, guid) == false then return end
     end
 
     local success, errormessage = pcall(function()
-        InventoryModule.RemoveItems(player1_uid, session.Player1.Offer, player1_inventory)
-        InventoryModule.RemoveItems(player2_uid, session.Player2.Offer, player2_inventory)
-        InventoryModule.AddItems(player1_uid, session.Player2.Offer, player1_inventory)
-        InventoryModule.AddItems(player2_uid, session.Player1.Offer, player2_inventory)
+        InventoryModule.RemoveItems(player1_uid, session.Player1.Offer)
+        InventoryModule.RemoveItems(player2_uid, session.Player2.Offer)
+        InventoryModule.AddItems(player1_uid, session.Player2.Offer, nil, true)
+        InventoryModule.AddItems(player2_uid, session.Player1.Offer, nil, true)
         LeaderstatsModule.IncrementNumber(player1_uid, "Gems", session.Player2.Gems - session.Player1.Gems)
         LeaderstatsModule.IncrementNumber(player2_uid, "Gems", session.Player1.Gems - session.Player2.Gems)
     end)
@@ -209,7 +214,7 @@ to be implemented in future:
 - locking inventories during trades (DONE)
 - rate limiter
 - audit log
-- unique items being unique
+- unique items being unique (DONE)
 
 - client replication -> to be done for every single module, this is a massive future task
 

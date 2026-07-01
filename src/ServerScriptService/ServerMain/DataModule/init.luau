@@ -33,6 +33,8 @@ local function _GenerateDefaultData(): {[string]: any} --> default data
     return {
         Version = CURRENT_DATA_VERSION,
         SessionId = nil,
+        LastSaved = 0,
+
         _leaderstats = {
             Gems = 0
         },
@@ -45,7 +47,7 @@ local function _GenerateDefaultData(): {[string]: any} --> default data
 
         _settings = {
             RecieveRequests = true
-        }
+        },
 
         _inventory = {
             Stackable = {},
@@ -81,8 +83,12 @@ function DataModule.GetData(user_id: number): {[string]: any}? --> entire data t
                 if data == nil then
                     data = _GenerateDefaultData()
                 else
-                    if data.SessionId and data.SessionId ~= game.JobId and game.JobId ~= "" then
-                        error("DataModule/ERROR: session is currently locked by another server")
+                    if data.LastSaved ~= 0 and (os.time() - data.LastSaved) > 180 then
+                        data.LastSaved = os.time()
+                    else
+                        if data.SessionId and data.SessionId ~= game.JobId and game.JobId ~= "" then
+                            error(string.format("DataModule/ERROR: session locked: %i", user_id))
+                        end
                     end
                 end
 
@@ -108,9 +114,14 @@ function DataModule.GetData(user_id: number): {[string]: any}? --> entire data t
     warn(string.format("DataModule/ERROR: kicking player after fail to retrieve data after 3 attempts: %i", user_id))
     local player = Players:GetPlayerByUserId(user_id)
     if player then
-        player:Kick("Roblox data stores are down or session is locked. Please try rejoining later.")
+        player:Kick("Roblox data stores are down or session is locked. Please try rejoining in a few minutes.")
     end
     return nil
+end
+
+-- Get the cached player data inside of the player data table
+function DataModule.GetCachedData(user_id: number): {[string]: any}?
+    return PLAYER_DATA[user_id]
 end
 
 -- Save all player data
@@ -129,6 +140,7 @@ function DataModule.SaveData(user_id: number, release_session: boolean?): boolea
                     error("DataModule/ERROR: session lock mismatch; cannot overwrite data from another server")
                 end
 
+                current_data.LastSaved = os.time()
                 current_data.SessionId = if release_session then nil else game.JobId
                 current_data.Version = CURRENT_DATA_VERSION
 
@@ -153,6 +165,28 @@ function DataModule.SaveData(user_id: number, release_session: boolean?): boolea
     return false
 end
 
+-- Start auto saving loop
+function DataModule.StartAutoSave(): thread --> the auto save thread
+    return task.spawn(function()
+        while true do
+            task.wait(120)
+            local players: {Player} = Players:GetPlayers()
+            local count = #players
+            if count == 0 then
+                task.wait(30)
+                continue
+            end
+            for _, player: Player in players do
+                task.spawn(function()
+                    if not player.Parent then continue end
+                    DataModule.SaveData(player.UserId, false)
+                end)
+                task.wait(30 / count)
+            end
+        end
+    end)
+end
+
 -- Modify a player inventory
 function DataModule.UpdateInventory(user_id: number, inventory: ItemUtil.InventoryType)
     local current_data = PLAYER_DATA[user_id]
@@ -162,7 +196,7 @@ function DataModule.UpdateInventory(user_id: number, inventory: ItemUtil.Invento
     end
 
     if current_data._inventory then
-        current_data._inventory = inventory
+        TableUtil.Overwrite(current_data._inventory, inventory)
     end
 end
 

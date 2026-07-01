@@ -13,6 +13,7 @@ local Players = game:GetService("Players")
 
 -- Holds references to players _leaderstats directory inside PLAYER_DATA
 local LEADERSTATS: {[number]: {[string]: any}} = {} -- [user_id]: _leaderstats reference
+local LEADERSTATS_VALUES_CACHE: {[number]: {[string]: ValueBase}}
 
 --// MODULE //--
 
@@ -34,7 +35,7 @@ local function _UpdatePlayerLeaderstats(user_id: number)
 	end
 
 	for stat_name, value in LEADERSTATS[user_id] do
-		local value_instance = leaderstats_folder:FindFirstChild(stat_name)
+		local value_instance = LEADERSTATS_VALUES_CACHE[user_id][stat_name]
 		if value_instance then
 			value_instance.Value = value
 		else
@@ -49,6 +50,7 @@ local function _UpdatePlayerLeaderstats(user_id: number)
 				value_instance.Name = stat_name
 				value_instance.Value = value
 				value_instance.Parent = leaderstats_folder
+				LEADERSTATS_VALUES_CACHE[user_id][stat_name] = value_instance
 			end
 		end
 	end
@@ -62,11 +64,13 @@ local function _Allocate(user_id: number, leaderstats: {[string]: any})
 		warn(string.format("LeaderstatsModule/WARNING: updating already existing leaderstat allocation for player: %s, %i", user_name, user_id))
 	end
 	LEADERSTATS[user_id] = leaderstats
+	LEADERSTATS_VALUES_CACHE[user_id] = {}
 end
 
 -- Remove players leaderstats allocation
 local function _Wipe(user_id: number)
 	LEADERSTATS[user_id] = nil
+	LEADERSTATS_VALUES_CACHE[user_id] = nil
 end
 
 -- Increment a players stat inside of its leaderstats directory
@@ -98,7 +102,8 @@ end
 --- Public
 
 -- Create player leaderstats directory using player_data (from ServerMain)
-function LeaderstatsModule.CreateLeaderstats(user_id: number, player_data: {[string]: any})
+function LeaderstatsModule.OnPlayerAdded(player: Player, player_data: {[string]: any})
+	local user_id: number = player.UserId
 	if not player_data._leaderstats then
         warn(string.format("LeaderstatsModule/ERROR: no _leaderstats key in player data for user: %i", user_id))
 		return
@@ -108,7 +113,7 @@ function LeaderstatsModule.CreateLeaderstats(user_id: number, player_data: {[str
 end
 
 -- Remove the players leaderstats directory
-function LeaderstatsModule.RemoveLeaderstats(user_id: number)
+function LeaderstatsModule.OnPlayerRemoving(user_id: number)
 	_Wipe(user_id)
 end
 

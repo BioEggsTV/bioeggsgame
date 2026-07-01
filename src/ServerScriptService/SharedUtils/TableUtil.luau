@@ -38,7 +38,18 @@ function TableUtil.Reconcile(data: {[string]: any}, template: {[string]: any}): 
     return data
 end
 
-function TableUtil.RemoveFirst(t: {[any]: any}, a: any): bool --> whether element was removed
+function TableUtil.Overwrite(target: {[any]: any}, source: {[any]: any})
+    table.clear(target)
+    for k, v in source do
+        if type(v) == "table" then
+            target[k] = TableUtil.DeepCopy(v)
+        else
+            target[k] = v
+        end
+    end
+end
+
+function TableUtil.RemoveFirst(t: {[any]: any}, a: any): boolean --> whether element was removed
     local index = table.find(t, a)
     if index then
         table.remove(t, index)

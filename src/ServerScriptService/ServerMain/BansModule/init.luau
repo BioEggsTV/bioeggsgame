@@ -20,6 +20,11 @@ local BansModule = {}
 
 --- Private
 
+-- Formats a seconds value into a one decimal hour string
+local function _FormatSecondsToHour(seconds: number): string --> the formatted string
+	return tostring(math.floor(seconds / 3600 * 10) / 10) .. "h"
+end
+
 -- Get players saved ban data (if it exists)
 local function _GetData(user_id: number): any --> user ban data
     local success, result
@@ -114,16 +119,27 @@ BansModule.BanPlayer = _BanPlayer
 
 BansModule.UnbanPlayer = _UnbanPlayer
 
+function BansModule.OnPlayerAdded(player: Player)
+    local user_id: number, user_name: string = player.UserId, player.Name
+    local ban_data = _GetData(user_id)
+	if ban_data == nil then
+		warn(string.format("ServerMain/ERROR: Failed getting ban data for user: %s, %i", user_name, user_id))
+		return
+	end
+    if ban_data.banned_until ~= 0 and ban_data.banned_until <= os.time() then
+		_UnbanPlayer(user_id)
+	else
+	    if ban_data and ban_data ~= "NO_DATA" then
+		    if ban_data.is_banned == true then
+			    print(string.format("ServerMain/Kicking banned player: %s, %i", user_name, user_id))
+			    player:Kick(string.format(
+			    	"You were banned from this game.\nRemaining time: %s\nReason: %s",
+			    	_FormatSecondsToHour(ban_data.banned_until - os.time()),
+			    	ban_data.reason
+			    ))
+		    end
+	    end
+    end
+end
+
 return BansModule
-
---[[
-
-ban_data: {
-    is_banned: boolean,
-    banned_at: number,
-    banned_until: number,
-    banned_by: string,
-    reason: string
-}
-
-]]--

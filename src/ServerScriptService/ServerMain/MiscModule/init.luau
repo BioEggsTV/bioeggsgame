@@ -5,9 +5,14 @@
 	Handles miscellaneous player data
 ]]--
 
+--// SERVICES //--
+
+local Players = game:GetService("Players")
+
 --// VARIABLES //--
 
 local SESSION_START: {[number]: number} = {} -- [user_id]: os.time() at session start
+local PLAYTIME_UPDATE_THREADS: {[number]: thread} = {} -- [user_id]: playtime update thread
 
 --// MODULE //--
 
@@ -30,21 +35,15 @@ end
 -- Remove misc allocation
 local function _Wipe(user_id: number)
 	SESSION_START[user_id] = nil
-end
-
---- Public
-
--- Initialize misc data for a player
-function MiscModule.CreateMisc(user_id: number, player_data: {[string]: any})
-	if not player_data._misc then
-		warn(string.format("MiscModule/ERROR: no _misc key in player data for user: %i", user_id))
-		return
+	local playtime_thread: thread? = PLAYTIME_UPDATE_THREADS[user_id]
+	if playtime_thread then
+		task.cancel(playtime_thread)
 	end
-	_Allocate(user_id, player_data)
+	PLAYTIME_UPDATE_THREADS[user_id] = nil
 end
 
 -- Add elapsed time to playtime
-function MiscModule.UpdatePlaytime(user_id: number, player_data: {[string]: any})
+local function _UpdatePlaytime(user_id: number, player_data: {[string]: any})
 	local session_start = SESSION_START[user_id]
 	if not session_start then
 		warn(string.format("MiscModule/ERROR: no session start recorded for user: %i", user_id))
@@ -62,8 +61,32 @@ function MiscModule.UpdatePlaytime(user_id: number, player_data: {[string]: any}
 	SESSION_START[user_id] = os.time()
 end
 
+--- Public
+
+-- Initialize misc data for a player
+function MiscModule.OnPlayerAdded(player: Player, player_data: {[string]: any})
+	local user_id: number = player.UserId
+	if not player_data._misc then
+		warn(string.format("MiscModule/ERROR: no _misc key in player data for user: %i", user_id))
+		return
+	end
+	_Allocate(user_id, player_data)
+
+	-- Update playtime every 60 seconds
+	PLAYTIME_UPDATE_THREADS[user_id] = task.spawn(function()
+		local player: Player = game:GetService("Players"):GetPlayerByUserId(user_id)
+		while player and player.Parent do
+			task.wait(60)
+			if player and player.Parent then
+				_UpdatePlaytime(user_id, player_data)
+			end
+		end
+	end)
+end
+
 -- Remove misc allocation for a player
-function MiscModule.RemoveMisc(user_id: number)
+function MiscModule.OnPlayerRemoving(user_id: number, player_data: {[string]: any})
+	_UpdatePlaytime(user_id, player_data)
 	_Wipe(user_id)
 end
 

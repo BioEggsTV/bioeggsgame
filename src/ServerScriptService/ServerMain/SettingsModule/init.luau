@@ -71,15 +71,16 @@ end
 
 --- Public
 
-function SettingsModule.CreateSettings(user_id: number, player_data: {[string]: any})
+function SettingsModule.OnPlayerAdded(player: Player, player_data: {[string]: any})
+    local user_id: number = player.UserId
     if not player_data or not player_data._settings then
         warn(string.format("SettingsModule/ERROR: no _settings key in player data for user: %i", user_id))
 		return
 	end
-	_Allocate(user_id, player_data.settings)
+	_Allocate(user_id, player_data._settings)
 end
 
-function SettingsModule.RemoveSettings(user_id: number)
+function SettingsModule.OnPlayerRemoving(user_id: number)
     _Wipe(user_id)
 end
 

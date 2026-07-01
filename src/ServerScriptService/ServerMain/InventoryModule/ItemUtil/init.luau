@@ -13,10 +13,14 @@ export type ItemType = {
     Type: "Stackable" | "Unique",
     Data: {[string]: any}
 }
-export type InventoryType = {[string]: {[any]: ItemType}} -- ["Stackable" | "Unique"]: [item_name | index]: item_data
+export type InventoryType = {
+    Stackable: {[string]: ItemType},
+    Unique: {[string]: ItemType}
+}
 
 -- Stackable items use id as index;
--- Unique items use own Name as index
+-- Unique items use name as index;
+-- Inside an actual inventory table unique items use GUIDs as indices
 ItemsModule.ItemDatabase = {
     experience_potion_1 = {
         Name = "Small Experience Potion",
@@ -34,7 +38,7 @@ ItemsModule.ItemDatabase = {
         Type = "Unique",
         Data = {
             Experience = 0,
-            -- _uid = "" <- implement unique items actually being unique
+            -- _uid = "" <-- implement unique items actually being unique
         }
     }
 }
